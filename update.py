@@ -8,6 +8,7 @@ class Database():
         self.__connection = sqlite3.connect("./scripts/stm_info.db")
         self.__connection.execute('PRAGMA encoding = "UTF-8"')
 
+    # send a flag to signal last time database has been updated
     def updateTimes(self, data: list[gtfs_realtime_pb2.FeedEntity]) -> None:
         query = """UPDATE Map SET arrival_time = ? WHERE 
         trip_id = ? AND route_id = ? AND direction_id = ? 
@@ -38,13 +39,25 @@ class Database():
     def getTime(self, route_id: str, trip_headsign: str, stop_name: str) -> list[tuple[int]]:
         # normal to have so many, a lot of redundancy, since it is a map
         query = """SELECT arrival_time FROM Map WHERE 
-        route_id = ? AND trip_headsign = ? AND stop_name = ?;
+        route_id = ? AND trip_headsign = ? AND stop_name = ? AND arrival_time > 0;
         """
         cursor = self.__connection.cursor()
-        cursor.execute(query)
-        data = cursor.fetchall()
-        cursor.close()
-        return data
+        if self.__exists_route_id(cursor, route_id):
+            cursor.execute(query, (route_id, trip_headsign, stop_name))
+            data = cursor.fetchall()
+            cursor.close()
+            return data
+        else:
+            cursor.close()
+            return None
+
+    def __exists_route_id(self, cursor, route_id: str) -> bool:
+        query = "SELECT * FROM Map WHERE route_id = ? LIMIT 1;"
+        cursor.execute(query, (route_id,))
+        data = cursor.fetchone()
+        if data is not None:
+            return not data == ""
+        return True
 
     def close(self) -> None:
         self.__connection.close()
