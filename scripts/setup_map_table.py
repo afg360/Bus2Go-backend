@@ -22,7 +22,7 @@ def map_table(conn):
         stop_id INTEGER NOT NULL,
         stop_seq INTEGER NOT NULL,
         direction_id INTEGER NOT NULL,
-        arrival_time TEXT NOT NULL -- testing if it works
+        arrival_time INTEGER NOT NULL -- testing if it works
     );
     """
     cursor.execute(query)
@@ -40,7 +40,7 @@ def map_table(conn):
             break
         else:
             writing_cursor.execute("BEGIN TRANSACTION;")
-            sql = "INSERT INTO Map (trip_id,trip_headsign,route_id,stop_name,stop_id,stop_seq,direction_id, arrival_time) VALUES (?,?,?,?,?,?,?,?);\n"
+            sql = "INSERT INTO Map (trip_id,trip_headsign,route_id,stop_name,stop_id,stop_seq,direction_id, arrival_time) VALUES (?,?,?,?,?,?,?,0);\n"
             print(f"Created chunk #{i}, executing query")
             writing_cursor.executemany(sql, chunk)
             conn.commit()
@@ -48,10 +48,10 @@ def map_table(conn):
             # chunk = []
     print("Successfully inserted data in table Map")
 
-    # query = "CREATE INDEX StopTimesIndex ON StopTimes(stop_id,trip_id);"
-    # print("Creating index for StopTimes on stopid and tripid")
-    # cursor.execute(query)
-    # print("Successfully created index for table StopTimes")
+    query = "CREATE INDEX MapIndex ON Map(trip_id,route_id,stop_id,direction_id);"
+    print("Creating index for StopTimes on stopid and tripid")
+    cursor.execute(query)
+    print("Successfully created index for table StopTimes")
     cursor.close()
 
 
