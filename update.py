@@ -1,6 +1,8 @@
 ##!/bin/python3
 import gtfs_realtime_pb2
 import sqlite3
+import pdb
+import asyncio
 
 
 class Database():
@@ -36,7 +38,7 @@ class Database():
             i += 1
         cursor.close()
 
-    def getTime(self, route_id: str, trip_headsign: str, stop_name: str) -> list[tuple[int]]:
+    async def getTime(self, route_id: str, trip_headsign: str, stop_name: str) -> list[int] | None:
         # normal to have so many, a lot of redundancy, since it is a map
         query = """SELECT arrival_time FROM Map WHERE 
         route_id = ? AND trip_headsign = ? AND stop_name = ? AND arrival_time > 0;
@@ -46,7 +48,7 @@ class Database():
             cursor.execute(query, (route_id, trip_headsign, stop_name))
             data = cursor.fetchall()
             cursor.close()
-            return data
+            return list(map(lambda x: x[0], data)) if len(data) > 0 else list()
         else:
             cursor.close()
             return None
@@ -55,12 +57,23 @@ class Database():
         query = "SELECT * FROM Map WHERE route_id = ? LIMIT 1;"
         cursor.execute(query, (route_id,))
         data = cursor.fetchone()
-        if data is not None:
+        if not data is None:
             return not data == ""
-        return True
+        return False
 
     def close(self) -> None:
         self.__connection.close()
+
+
+def main(database: Database) -> None:
+    database.updateTimes(feed.entity)
+
+
+async def test(database: Database) -> None:
+    print(await database.getTime("165", "Sud", "Côte-des-Neiges / Mackenzie"))
+    print(await database.getTime("2435", "2345", "2345"))
+    print(await database.getTime("165", "Nord", "Côte-des-Neiges / Mackenzie"))
+    database.close()
 
 
 if __name__ == "__main__":
@@ -69,5 +82,5 @@ if __name__ == "__main__":
         feed.ParseFromString(file.read())
 
     database = Database()
-    database.updateTimes(feed.entity)
-    database.close()
+    #main(database)
+    asyncio.run(test(database))

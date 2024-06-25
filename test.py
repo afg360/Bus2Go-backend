@@ -1,40 +1,60 @@
 from urllib.parse import quote
 import asyncio
 import aiohttp
+import pdb
 
+#for stm
+base_url = "http://127.0.0.1:8080/api/realtime/STM"
 
-base_url = "http://127.0.0.1:8000/api/realtime/stm"
-
-async def test(route_id: str, trip_headsign: str, stop_name: str):
+async def test(route_id: str, trip_headsign: str, stop_name: str, expected_code: int):
+    route_id = quote(route_id)
+    trip_headsign = quote(trip_headsign)
     stop_name = quote(stop_name)
     url = f"{base_url}/?route_id={route_id}&trip_headsign={trip_headsign}&stop_name={stop_name}"
     print(url)
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
-            return await response.text()
+            return {"answer": await response.text(), "expected": expected_code, "received": response.status}
 
 
 async def main():
     test_cases = [
+        # in this case, the stop DOES NOT exist in that direction, only in the opposite
+        {
+            "route_id": "165",
+            "trip_headsign": "Sud",
+            "stop_name": "Côte-des-Neiges / Jean-Talon",
+            "expected_code": 404
+        },
         {
             "route_id": "165",
             "trip_headsign": "Nord",
-            "stop_name": "Côte-des-Neiges / Jean-Talon"
+            "stop_name": "Côte-des-Neiges / Mackenzie",
+            "expected_code": 200
         },
         {
             "route_id": "103",
             "trip_headsign": "Est",
-            "stop_name": "de Monkland / Royal"
+            "stop_name": "de Monkland / Royal",
+            "expected_code": 200
         },
         {
             "route_id": "23984",
             "trip_headsign": "Est",
-            "stop_name": "Côte-des-Neiges / Jean-Talon"
+            "stop_name": "Côte-des-Neiges / Jean-Talon",
+            "expected_code": 418
+        },
+        {
+            "route_id": "103o",
+            "trip_headsign": "Est",
+            "stop_name": "ghol",
+            "expected_code": 418
         }
     ]
     tasks = [test(test_case["route_id"],
                   test_case["trip_headsign"],
-                  test_case["stop_name"]) for test_case in test_cases]
+                  test_case["stop_name"],
+                  test_case["expected_code"]) for test_case in test_cases]
     results = await asyncio.gather(*tasks)
     print(results)
 
