@@ -4,6 +4,7 @@ from database import Database
 from enum import Enum
 from urllib.parse import unquote
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
 
 import pdb
@@ -28,16 +29,35 @@ class TransitTime(BaseModel):
     arrival_time: list | str | None
 
 
+import logging
+logging.basicConfig(
+    level=logging.INFO,  # Set the logging level to INFO or desired level
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
-jobs = {}
+
+async def job(database: Database):
+    await database.updateTimes()
+    logging.info("Updated database")
+
+
+instances = {}
+
 
 @asynccontextmanager
-async def lifespan(app : FastAPI):
-    jobs["database"] = Database()
-    #jobs["database"].setPeriodicJob
-    yield
-    jobs["database"].close
-    jobs.clear()
+async def lifespan(app: FastAPI):
+    logging.info("Testing start up")
+    instances["database"] = Database()
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(job, 'interval', seconds=10, args=[instances["database"]])
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
+        instances["database"].close()
+        instances.clear()
 
 
 # add a call where outputs the newer version of the application, perhaps using the github api
@@ -66,7 +86,7 @@ async def api_version():
 
 @app.get("/api/realtime/"+VERSION+"/")
 async def get_data_agency(agency: Agency, route_id: str, trip_headsign: str, stop_name: str) -> TransitTime:
-    database = jobs["database"]
+    database = instances["database"]
     item = TransitInfo(agency=agency, route_id=route_id, trip_headsign=trip_headsign, stop_name=unquote(stop_name))
     if item.agency == Agency.STM:
         lst = await database.getTime(item.route_id, item.trip_headsign, item.stop_name)
@@ -85,11 +105,6 @@ async def get_data_agency(agency: Agency, route_id: str, trip_headsign: str, sto
     """except Exception as e:
         #logger.error(f"Exception occurred: {str(e)}")
 """
-
-
-async def update():
-    while True:
-        asyncio.sleep(30)
 
 
 async def test():

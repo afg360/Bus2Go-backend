@@ -11,7 +11,7 @@ async def test(agency: str, route_id: str, trip_headsign: str, stop_name: str, e
     trip_headsign = quote(trip_headsign)
     stop_name = quote(stop_name)
     url = f"{base_url}/?agency={agency}&route_id={route_id}&trip_headsign={trip_headsign}&stop_name={stop_name}"
-    print(url)
+    #print(url)
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             return {"answer": await response.text(), "expected": expected_code, "received": response.status}
@@ -60,5 +60,11 @@ async def main():
     print(results)
 
 
+async def test2():
+    while True:
+        print(await test("STM", "103", "Est", "de Monkland / Royal", 200))
+        await asyncio.sleep(12)
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test2())

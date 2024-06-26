@@ -18,7 +18,7 @@ def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
     if response.status_code == 200:
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.ParseFromString(response.content)
-        return feed
+        return feed.entity
     else:
         pass
 
