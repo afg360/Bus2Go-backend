@@ -4,13 +4,13 @@ import aiohttp
 import pdb
 
 #for stm
-base_url = "http://127.0.0.1:8080/api/realtime/STM"
+base_url = "http://127.0.0.1:8080/api/realtime/v1"
 
-async def test(route_id: str, trip_headsign: str, stop_name: str, expected_code: int):
+async def test(agency: str, route_id: str, trip_headsign: str, stop_name: str, expected_code: int):
     route_id = quote(route_id)
     trip_headsign = quote(trip_headsign)
     stop_name = quote(stop_name)
-    url = f"{base_url}/?route_id={route_id}&trip_headsign={trip_headsign}&stop_name={stop_name}"
+    url = f"{base_url}/?agency={agency}&route_id={route_id}&trip_headsign={trip_headsign}&stop_name={stop_name}"
     print(url)
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
@@ -51,7 +51,8 @@ async def main():
             "expected_code": 418
         }
     ]
-    tasks = [test(test_case["route_id"],
+    tasks = [test("STM",
+                  test_case["route_id"],
                   test_case["trip_headsign"],
                   test_case["stop_name"],
                   test_case["expected_code"]) for test_case in test_cases]

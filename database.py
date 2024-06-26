@@ -1,8 +1,26 @@
-##!/bin/python3
 import gtfs_realtime_pb2
 import sqlite3
 import pdb
 import asyncio
+import requests
+
+
+def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
+    tokens = {}
+    url = "https://api.stm.info/pub/od/gtfs-rt/ic/v2/tripUpdates"
+    with open("./config", "r") as file:
+        for line in file:
+            #pdb.set_trace()
+            line = line.rsplit()[0]
+            info = line.split('=')
+            tokens[info[0]] = info[1]
+    response = requests.get(url, headers={"apiKey": tokens["stm_token"]})
+    if response.status_code == 200:
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.ParseFromString(response.content)
+        return feed
+    else:
+        pass
 
 
 class Database():
@@ -11,11 +29,12 @@ class Database():
         self.__connection.execute('PRAGMA encoding = "UTF-8"')
 
     # send a flag to signal last time database has been updated
-    def updateTimes(self, data: list[gtfs_realtime_pb2.FeedEntity]) -> None:
+    async def updateTimes(self) -> None:
         query = """UPDATE Map SET arrival_time = ? WHERE 
         trip_id = ? AND route_id = ? AND direction_id = ? 
         AND stop_id = ?;
         """
+        data = get_new_realtime_data()
         cursor = self.__connection.cursor()
         # perhaps divide in chunks
         i = 1
@@ -70,16 +89,21 @@ def main(database: Database) -> None:
 
 
 async def test(database: Database) -> None:
-    print(await database.getTime("165", "Sud", "Côte-des-Neiges / Mackenzie"))
-    print(await database.getTime("2435", "2345", "2345"))
-    print(await database.getTime("165", "Nord", "Côte-des-Neiges / Mackenzie"))
+    jobs = [
+       database.getTime("165", "Sud", "Côte-des-Neiges / Mackenzie"), 
+       database.getTime("2435", "2345", "2345"),
+       database.getTime("165", "Nord", "Côte-des-Neiges / Mackenzie")
+    ]
+    #print(get_new_realtime_data())
+    results = await asyncio.gather(*jobs)
+    print(results)
     database.close()
 
 
 if __name__ == "__main__":
-    feed = gtfs_realtime_pb2.FeedMessage()
-    with open("./data/stm.txt", "rb") as file:
-        feed.ParseFromString(file.read())
+    #feed = gtfs_realtime_pb2.FeedMessage()
+    #with open("./data/stm.txt", "rb") as file:
+    #    feed.ParseFromString(file.read())
 
     database = Database()
     #main(database)
