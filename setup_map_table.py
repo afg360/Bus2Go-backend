@@ -12,6 +12,7 @@ def map_table(conn):
     cursor.execute(query)
     print("Dropped Index MapIndex\n")
 
+    print("Creating table Map")
     # need to somehow include times for the table
     query = """CREATE TABLE Map (
         id INTEGER PRIMARY KEY NOT NULL,
@@ -49,9 +50,9 @@ def map_table(conn):
     print("Successfully inserted data in table Map")
 
     query = "CREATE INDEX MapIndex ON Map(trip_id,route_id,stop_id,direction_id);"
-    print("Creating index for StopTimes on stopid and tripid")
+    print("Creating index for Map on trip_id, route_id, stop_id and direction_id")
     cursor.execute(query)
-    print("Successfully created index for table StopTimes")
+    print("Successfully created index for table Map")
     cursor.close()
 
 

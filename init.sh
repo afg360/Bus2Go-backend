@@ -17,6 +17,8 @@ if ! command -v docker &> /dev/null; then
 	source ./venv/bin/activate
 	pip install -r requirements.txt
 else
+	#check if docker is running, assuming usage of systemd. Start the service if not
+	[ "$(sudo systemctl status docker | grep 'Active:' | awk '{print $2}')" = "inactive" ] && sudo systemctl start docker
 	#using legacy docker building...
 	sudo docker build -t test-backend:latest .
 	sudo docker run -p 127.0.0.1:8000:8000 test-backend:latest
