@@ -24,9 +24,10 @@ def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
 
 
 class Database():
-    def __init__(self):
-        self.__connection = sqlite3.connect("./scripts/stm_info.db")
+    def __init__(self, debug: str = None):
+        self.__connection = sqlite3.connect("./stm_info.db")
         self.__connection.execute('PRAGMA encoding = "UTF-8"')
+        self.__debug = debug
 
     # send a flag to signal last time database has been updated
     async def updateTimes(self) -> None:
@@ -53,12 +54,14 @@ class Database():
             cursor.executemany(query, chunk)
             self.__connection.commit()
             chunk = []
-            print(f"Committed chunk#{i}")
+            if self.__debug:
+                print(f"Committed chunk#{i}")
             i += 1
         cursor.close()
 
     async def getTime(self, route_id: str, trip_headsign: str, stop_name: str) -> list[int] | None:
         # normal to have so many, a lot of redundancy, since it is a map
+        # need to be sure to get the right updated data, may change and then stop depending on stop code used
         query = """SELECT arrival_time FROM Map WHERE 
         route_id = ? AND trip_headsign = ? AND stop_name = ? AND arrival_time > 0;
         """
@@ -105,6 +108,6 @@ if __name__ == "__main__":
     #with open("./data/stm.txt", "rb") as file:
     #    feed.ParseFromString(file.read())
 
-    database = Database()
+    database = Database("DEBUG")
     #main(database)
     asyncio.run(test(database))

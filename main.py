@@ -38,8 +38,12 @@ logging.basicConfig(
 
 
 async def job(database: Database):
-    await database.updateTimes()
-    logging.info("Updated database")
+    logging.info("Updating database")
+    try:
+        await database.updateTimes()
+        logging.info("Updated database")
+    except Exception as e:
+        logging.error(f"An error occured trying to update database, {e}")
 
 
 instances = {}
@@ -50,7 +54,7 @@ async def lifespan(app: FastAPI):
     logging.info("Testing start up")
     instances["database"] = Database()
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(job, 'interval', seconds=10, args=[instances["database"]])
+    scheduler.add_job(job, 'interval', seconds=20, args=[instances["database"]])
     scheduler.start()
     try:
         yield

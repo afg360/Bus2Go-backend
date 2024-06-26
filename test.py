@@ -4,7 +4,7 @@ import aiohttp
 import pdb
 
 #for stm
-base_url = "http://127.0.0.1:8080/api/realtime/v1"
+base_url = "http://127.0.0.1:8000/api/realtime/v1"
 
 async def test(agency: str, route_id: str, trip_headsign: str, stop_name: str, expected_code: int):
     route_id = quote(route_id)
