@@ -3,12 +3,13 @@ import sqlite3
 import pdb
 import asyncio
 import requests
+import time
 
 
 def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
     tokens = {}
     url = "https://api.stm.info/pub/od/gtfs-rt/ic/v2/tripUpdates"
-    with open("./config", "r") as file:
+    with open("./.env", "r") as file:
         for line in file:
             #pdb.set_trace()
             line = line.rsplit()[0]
@@ -62,12 +63,13 @@ class Database():
     async def getTime(self, route_id: str, trip_headsign: str, stop_name: str) -> list[int] | None:
         # normal to have so many, a lot of redundancy, since it is a map
         # need to be sure to get the right updated data, may change and then stop depending on stop code used
+        time_range = int(time.time()) - 3 * 60# some small range, say 3 minutes
         query = """SELECT arrival_time FROM Map WHERE 
-        route_id = ? AND trip_headsign = ? AND stop_name = ? AND arrival_time > 0;
+        route_id = ? AND trip_headsign = ? AND stop_name = ? AND arrival_time > ? ORDER BY arrival_time;
         """
         cursor = self.__connection.cursor()
         if self.__exists_route_id(cursor, route_id):
-            cursor.execute(query, (route_id, trip_headsign, stop_name))
+            cursor.execute(query, (route_id, trip_headsign, stop_name, time_range))
             data = cursor.fetchall()
             cursor.close()
             return list(map(lambda x: x[0], data)) if len(data) > 0 else list()
