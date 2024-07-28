@@ -5,9 +5,9 @@ FROM python:3
 
 WORKDIR /app
 
-COPY config main.py database.py gtfs_realtime_pb2.py stm_info.db /app/
+COPY .env main.py database.py gtfs_realtime_pb2.py stm_info.db /app/
 
-COPY requirements.txt /tmp/
+COPY ./misc/requirements.txt /tmp/
 RUN pip install -r /tmp/requirements.txt
 
 EXPOSE 8000

@@ -1,7 +1,6 @@
 import psycopg2
 import argparse
 import requests
-import threading
 import zipfile
 import os
 import sys

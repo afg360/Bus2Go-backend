@@ -7,9 +7,6 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
 
-import pdb
-#may need to log data!!
-
 
 class Agency(str, Enum):
     STM = "STM"
@@ -42,8 +39,10 @@ async def job(database: Database):
     try:
         await database.updateTimes()
         logging.info("Updated database")
-    except Exception as e:
-        logging.error(f"An error occured trying to update database, {e}")
+    except TypeError:
+        logging.error(f"The connection pool is None. Cannot update the database")
+    #except Exception as e:
+        #logging.error(f"An error occured trying to update database, {e}")
 
 
 instances = {}
@@ -52,7 +51,7 @@ instances = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging.info("Testing start up")
-    instances["database"] = Database()
+    instances["database"] = await Database.create("dabawss", "")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(job, 'interval', seconds=20, args=[instances["database"]])
     scheduler.start()
@@ -60,7 +59,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         scheduler.shutdown()
-        instances["database"].close()
+        await instances["database"].close()
         instances.clear()
 
 

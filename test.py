@@ -67,4 +67,4 @@ async def test2():
 
 
 if __name__ == "__main__":
-    asyncio.run(test2())
+    asyncio.run(main())
