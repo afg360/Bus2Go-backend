@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketException, status
 from pydantic import BaseModel
 from database import Database
 from enum import Enum
@@ -86,33 +86,50 @@ app = FastAPI(title="Bus2Go-realtime",
 async def api_version():
     return {"version": app.version}
 
+@app.websocket("/api/realtime/test")
+async def test_web_sockets(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message received: {data}")
 
-@app.get("/api/realtime/"+VERSION+"/")
-async def get_data_agency(agency: Agency, route_id: str, trip_headsign: str, stop_name: str) -> TransitTime:
+#use the query paramaters from a message
+@app.websocket("/api/realtime/"+VERSION+"/")
+async def get_data_agency(websocket: WebSocket) -> TransitTime:
+    await websocket.accept()
     database = instances["database"]
-    item = TransitInfo(agency=agency, route_id=route_id, trip_headsign=trip_headsign, stop_name=unquote(stop_name))
-    if item.agency == Agency.STM:
-        lst = await database.getTime(item.route_id, item.trip_headsign, item.stop_name)
-        #pdb.set_trace()
-        if lst is None:
-            raise HTTPException(status_code=418, 
-                                detail="The route_id does not exist!", 
-                                headers={"TransitTime": TransitTime(transit_info=item, arrival_time="").json()}
-                                )
-        elif len(lst) == 0:
-            raise HTTPException(status_code=404, 
-                                 detail="No arrival times found",
-                                 headers={"TransitTime": TransitTime(transit_info=item, arrival_time="").json()}
-                                 )
-        return TransitTime(transit_info=item, arrival_time=lst)
-    """except Exception as e:
-        #logger.error(f"Exception occurred: {str(e)}")
-"""
+    while True:
+        #get query data
+        #format = {"agency" : agency, "route_id" : route_id, "trip_headsign" : trip_headsign, "stop_name" : stop_name}
+        data : dict[str, Agency | str] = await websocket.receive_json()
+        item = TransitInfo(agency=data["agency"], route_id=data["route_id"], trip_headsign=data["trip_headsign"], stop_name=data["stop_name"]) #type: ignore
+        
+        if item.agency == Agency.STM:
+            lst = await database.getTime(item.route_id, item.trip_headsign, item.stop_name)
+            if lst is None:
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+            elif len(lst) == 0:
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+            await websocket.send_json(TransitTime(transit_info=item, arrival_time=lst))
+            #await asyncio.sleep(5)
+        #close the connection if no data has been received for a while (e.g. 1 minute, 30 seconds, or wtv)
+
+        else:
+            #not implemented yet
+            raise WebSocketException(code=status.WS_1011_INTERNAL_ERROR, reason="Not implemented for this agency yet")
+
+
+#will need to have some more entries to download the right data
+@app.get("/api/download/"+VERSION+"/")
+async def download_database() -> TransitTime:
+    """Download the requested data to create the database in the client application"""
+    pass
 
 
 async def test():
-    lst = await get_data_agency(Agency.STM, "165", "Nord", "Côte-des-Neiges / Mackenzie")
-    print(lst)
+    #lst = await get_data_agency(Agency.STM, "165", "Nord", "Côte-des-Neiges / Mackenzie")
+    #print(lst)
+    pass
 
 if __name__ == "__main__":
     asyncio.run(test())
