@@ -5,7 +5,7 @@ import aiohttp
 import time
 
 
-async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
+async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | int | None:
     tokens = {}
     url = "https://api.stm.info/pub/od/gtfs-rt/ic/v2/tripUpdates"
     with open("./.env", "r") as file:
@@ -15,13 +15,16 @@ async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
             info = line.split('=')
             tokens[info[0]] = info[1]
     async with aiohttp.ClientSession() as session:
-        async with await session.get(url, headers={"apiKey": tokens["stm_token"]}) as response:
-            if response.status == 200:
-                feed = gtfs_realtime_pb2.FeedMessage()
-                feed.ParseFromString(await response.read())
-                return feed.entity
-            else:
-                pass
+        try:
+            async with await session.get(url, headers={"apiKey": tokens["stm_token"]}) as response:
+                if response.status == 200:
+                    feed = gtfs_realtime_pb2.FeedMessage()
+                    feed.ParseFromString(await response.read())
+                    return feed.entity
+                else:
+                    pass
+        except aiohttp.client_exceptions.ClientConnectorError:
+            return 1
 
 
 class Database():
@@ -55,9 +58,11 @@ class Database():
             raise AssertionError("Error trying to parse the feed message. Aborting")
             #add some log message
             return
+        elif data == 1:
+            raise TimeoutError()
         # perhaps divide in chunks
         i = 1
-        for entity in data:
+        for entity in data: #type: ignore
             chunk = []
             if entity.HasField("trip_update"):
                 trip_update = entity.trip_update
