@@ -3,6 +3,28 @@ import asyncpg
 import asyncio
 import aiohttp
 import time
+#for testing purposes
+import random
+
+from enum import Enum
+from pydantic import BaseModel
+
+class Agency(str, Enum):
+    STM = "STM"
+    EXO = "EXO_OTHER"
+    TRAIN = "EXO_TRAIN"
+
+
+class TransitInfo(BaseModel):
+    agency: Agency
+    route_id: str
+    trip_headsign: str
+    stop_name: str
+
+
+class TransitTime(BaseModel):
+    transit_info: TransitInfo
+    arrival_time: list[int] | str | None
 
 
 async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | int | None:
@@ -96,6 +118,30 @@ class Database():
                     return [x[0] for x in data] if len(data) > 0 else []
                 else:
                     return None
+
+    async def get_random(self) -> list[TransitTime]:
+        """For testing purposes. Output info from a random bus"""
+        length_q = "SELECT COUNT(*) FROM Routes;"
+        async with self.__connection_pool.acquire() as connection: #type: ignore
+            async with connection.transaction():
+                length = int((await connection.fetchrow(length_q))[0])
+                lst = []
+                for i in range(2):
+                    route_id = str(random.randint(1, length))
+                    query = "SELECT * FROM Map WHERE route_id = $1"
+                    row = await connection.fetchrow(query, route_id)
+                    print(row)
+                    lst.append(TransitTime(
+                        transit_info=TransitInfo(
+                            agency=Agency.STM,
+                            route_id=row[3],
+                            trip_headsign=row[2],
+                            stop_name=row[4]
+                        ),
+                        arrival_time=[row[8]]
+                    ))
+                return lst
+
 
     async def __exists_route_id(self, connection, route_id: str) -> bool:
         query = "SELECT * FROM Map WHERE route_id = $1 LIMIT 1;"

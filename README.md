@@ -7,9 +7,9 @@ It acts as a proxy server. It hosts a copy of the database similar to the one de
 ## Initialising
 Before doing anything, be sure to have a copy of the database required. Initialisation scripts are available at [https://github.com/afg360/Bus2Go/tree/master/scripts](https://github.com/afg360/Bus2Go/tree/master/scripts). You must move or copy the db file to the directory of this file.
 
-You also must have the right api keys to the transit agencies to be able to make the api calls to their servers. Write them in a file names "config", the syntax look like this:
+You also must have the right api keys to the transit agencies to be able to make the api calls to their servers. Write them in a file named "config", the syntax look like this:
 ```
-<agency-name>_token=your_api_token
+<agency-name>_token=<your-api-token>
 ```
 For the moment only the stm api is enabled
 
@@ -28,5 +28,5 @@ or (on windows)
 
 If you didn't use docker, you can start the server by running the command (under the virtual environment):
 ```
-uvicorn main:app --host 127.0.0.1 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```

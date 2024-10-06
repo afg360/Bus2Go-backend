@@ -64,7 +64,16 @@ def init_database(username: str, password: str) -> None:
         map_table(conn)
 
         conn.close()
-    except psycopg2.OperationalError as oe:
+
+        answer = input("Do you want to clean up the directory from txt files? (y/n) ")
+        if answer == "yes" or "y":
+            print("Cleaning up")
+            os.remove("*.txt")
+            print("Cleaned up")
+        else:
+            print("Not cleaning up")
+
+    except psycopg2.OperationalError:
         print(f"The username {username} does not exist. Aborting the script.")
         sys.exit(1)
 
@@ -82,7 +91,7 @@ def calendar_table(conn):
     cursor.execute(sql)
     print("Initialised table Calendar")
 
-    print("Inserting table and adding data")
+    print("Inserting in table Calendar and adding data")
     with open("calendar.txt", "r", encoding="utf-8") as file:
         file.readline()
         for line in file:
@@ -120,7 +129,7 @@ def forms_table(conn):
     cursor.execute(sql)
     print("Initialised table Forms")
 
-    print("Inserting tables")
+    print("Inserting in table Forms")
     queries = []
     with open("./shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
@@ -153,7 +162,7 @@ def route_table(conn):
     cursor.execute(sql)
     print("Initialised table routes")
 
-    print("Inserting table and adding data")
+    print("Inserting in table Route and adding data")
     with open("routes.txt", "r", encoding="utf-8") as file:
         file.readline()
         for line in file:
@@ -178,7 +187,7 @@ def shapes_table(conn):
     cursor.execute(sql)
     print("Initialised table shapes")
 
-    print("Inserting tables")
+    print("Inserting in table Shapes")
     queries = []
     with open("shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
@@ -212,28 +221,6 @@ def stop_times_table(conn):
 
     with open("stop_times.txt", "r", encoding="utf-8") as file:
         cursor.copy_expert("COPY StopTimes(trip_id, arrival_time, departure_time, stop_id, stop_seq) FROM STDIN CSV HEADER;", file)
-    """
-    chunk_size = 100000
-        file.readline()
-        chunk = []
-        cursor.execute("BEGIN TRANSACTION;")
-        sql = "INSERT INTO StopTimes (trip_id,arrival_time,departure_time,stop_id,stop_seq) VALUES (%s,%s,%s,%s,%s);\n"
-        i = 1
-        for line in file:
-            chunk.append(line.split(","))
-            if len(chunk) >= chunk_size:
-                print(f"Created chunk #{i}, executing query")
-                cursor.executemany(sql, chunk)
-                conn.commit()
-                i += 1
-                chunk = []
-                cursor.execute("BEGIN TRANSACTION;")
-        if chunk is not None:
-            print("Executing final query")
-            cursor.executemany(sql, chunk)
-            conn.commit()
-    print("Successfully inserted table\n")
-    """
     conn.commit()
 
     query = "CREATE INDEX StopTimesIndex ON StopTimes(stop_id,trip_id);"
@@ -258,7 +245,7 @@ def stops_table(conn):
     cursor.execute(sql)
     print("Initialised table stops")
 
-    print("Inserting tables")
+    print("Inserting in table Stops")
     chunk = []
     with open("stops.txt", "r", encoding="utf-8") as file:
         file.readline()
@@ -291,7 +278,7 @@ def trips_table(conn):
     );"""
     cursor.execute(query)
 
-    print("Inserting table and adding data")
+    print("Inserting in table Trips and adding data")
     chunk_size = 500000
     with open("trips.txt", "r", encoding="utf-8") as file:
         file.readline()
@@ -335,10 +322,8 @@ def stops_info_table(conn):
     JOIN calendar ON calendar.service_id = trips.service_id
     JOIN stops ON stoptimes.stop_id = stops.stop_id;
     """
-    print("Inserting data into StopsInfo")
+    print("Inserting in table StopsInfo")
     cursor.execute(sql)
-    cursor.execute("DROP TABLE IF EXISTS StopTimes CASCADE;")
-    cursor.execute("DROP INDEX IF EXISTS StopTimesIndex CASCADE;")
 
     print("Vacuuming database")
     cursor.execute("VACUUM FULL;")
@@ -387,9 +372,7 @@ def main():
 
     args = parser.parse_args()
 
-    if (args.no_download):
-        pass
-    else:
+    if not args.no_download:
         download("https://www.stm.info/sites/default/files/gtfs/gtfs_stm.zip")
 
     init_database(args.user[0], args.password[0])
