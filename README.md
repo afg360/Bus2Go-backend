@@ -26,7 +26,7 @@ or (on windows)
 ./init.ps1
 ```
 
-If you didn't use docker, you can start the server by running the command (under the virtual environment):
+If you didn't use docker, you can start the server by running the "start.sh" script on unix systems (be sure to set the correct execute permissions), by running the command (under the virtual environment):
 ```
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```

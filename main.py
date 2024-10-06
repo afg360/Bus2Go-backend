@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from database import Database, Agency, TransitInfo, TransitTime
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-#import pdb
 import asyncio
 
 #TODO WHEN SENDING DATA VIA WEBSOCKETS, USE SEND_TEXT, NOT FUCKING JSON, EVEN IF SENDING ACTUAL JSON DATA
@@ -152,10 +151,13 @@ async def get_data_agency(websocket: WebSocket) -> TransitTime:
 
 
 #will need to have some more entries to download the right data
-@app.get("/api/download/"+VERSION+"/")
-async def download_database() -> TransitTime:
+@app.get("/api/download/"+VERSION)
+async def download_database(agency: Agency | None = None):
     """Download the requested data to create the database in the client application"""
-    pass
+    if agency is not None:
+        print(agency)
+    else:
+        print("No queried shit")
 
 
 async def test():
