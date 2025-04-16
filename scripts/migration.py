@@ -1,14 +1,24 @@
+#!/usr/bin/env python3
+
 import psycopg2
 import argparse
 import requests
 import zipfile
 import os
 import sys
+import sys
+from pathlib import Path
 
+src_path = Path(__file__).parents[1]
+sys.path.append(str(src_path))
+
+from src import settings
+
+directory = "data/downloads"
 
 def download(url : str): #destination : str) -> None:
     """download and create respective directories"""
-    zip_file = "data.zip"   #f"{destination}.zip"
+    zip_file = f"{directory}/data.zip"   #f"{destination}.zip"
     print(f"Downloading from {url}")
     response = requests.get(url)
     if response.status_code == 200:
@@ -18,7 +28,7 @@ def download(url : str): #destination : str) -> None:
         #if not os.path.exists(f"./{destination}"):
         #    os.makedirs(destination)
         with zipfile.ZipFile(zip_file, "r") as zip:
-            zip.extractall(f"./")#{destination}")
+            zip.extractall(f"{directory}")
         print(f"Extracted file from {zip_file}")
         os.remove(zip_file)
         print("Removed zip file")
@@ -26,13 +36,13 @@ def download(url : str): #destination : str) -> None:
         print(f"Failed to download {url}")
 
 
-def init_database(username: str, password: str) -> None:
+def init_database() -> None:
     """Initialise the data in the database associated to that agency"""
     try:
         conn = psycopg2.connect(
-            database="bus2go",
-            user=username,
-            password=password
+            database = settings.DB_NAME,
+            user = settings.DB_USERNAME,
+            password = settings.DB_PASSWORD
         )
         conn.set_client_encoding("UTF8")
         # to manually commit and allow usage of vacuuming
@@ -68,13 +78,13 @@ def init_database(username: str, password: str) -> None:
         answer = input("Do you want to clean up the directory from txt files? (y/n) ")
         if answer == "yes" or "y":
             print("Cleaning up")
-            os.remove("*.txt")
+            os.remove(f"{directory}/*.txt")
             print("Cleaned up")
         else:
             print("Not cleaning up")
 
     except psycopg2.OperationalError:
-        print(f"The username {username} does not exist. Aborting the script.")
+        print(f"The username {settings.DB_USERNAME} does not exist. Aborting the script.")
         sys.exit(1)
 
 
@@ -92,7 +102,7 @@ def calendar_table(conn):
     print("Initialised table Calendar")
 
     print("Inserting in table Calendar and adding data")
-    with open("calendar.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/calendar.txt", "r", encoding="utf-8") as file:
         file.readline()
         for line in file:
             tokens = line.replace("\n", "").replace("'", "''").split(",")
@@ -131,7 +141,7 @@ def forms_table(conn):
 
     print("Inserting in table Forms")
     queries = []
-    with open("./shapes.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
         prev = ""
         for line in file:
@@ -163,7 +173,7 @@ def route_table(conn):
     print("Initialised table routes")
 
     print("Inserting in table Route and adding data")
-    with open("routes.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/routes.txt", "r", encoding="utf-8") as file:
         file.readline()
         for line in file:
             tokens = line.replace("\n", "").replace("'", "''").split(",")
@@ -189,14 +199,12 @@ def shapes_table(conn):
 
     print("Inserting in table Shapes")
     queries = []
-    with open("shapes.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
-        for line in file:
-            tokens = line.split(",")
-            queries.append((tokens[0], tokens[1], tokens[2], tokens[3]))
-        sql = "INSERT INTO Shapes (shape_id,lat,long,sequence) VALUES (%s,%s,%s,%s);"
-        #cursor.execute("BEGIN;")
-        cursor.executemany(sql, queries)
+        cursor.copy_expert(
+            "COPY Shapes (shape_id,lat,long,sequence) FROM STDIN WITH CSV",
+            file
+        )
         conn.commit()
     print("Successfully inserted table\n")
     cursor.close()
@@ -219,9 +227,9 @@ def stop_times_table(conn):
     print("Initialised tmp table StopTimes")
     print("Inserting table and adding data")
 
-    with open("stop_times.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/stop_times.txt", "r", encoding="utf-8") as file:
         cursor.copy_expert("COPY StopTimes(trip_id, arrival_time, departure_time, stop_id, stop_seq) FROM STDIN CSV HEADER;", file)
-    conn.commit()
+        conn.commit()
 
     query = "CREATE INDEX StopTimesIndex ON StopTimes(stop_id,trip_id);"
     print("Creating index for StopTimes on stopid and tripid")
@@ -233,7 +241,20 @@ def stop_times_table(conn):
 def stops_table(conn):
     cursor = conn.cursor()
 
-    sql = """CREATE TABLE Stops (
+    cursor.execute("""CREATE TEMP TABLE TMP_Stops (
+        stop_id TEXT UNIQUE NOT NULL,
+        stop_code INTEGER NOT NULL,
+        stop_name TEXT NOT NULL,
+        stop_lat REAL NOT NULL,
+        stop_lon REAL NOT NULL,
+        stop_url TEXT,
+        location_type TEXT,
+        parent_station TEXT,
+        wheelchair_boarding INTEGER NOT NULL
+    )
+    """)
+
+    cursor.execute("""CREATE TABLE Stops (
     	id SERIAL PRIMARY KEY NOT NULL,
     	stop_id TEXT UNIQUE NOT NULL,
     	stop_code INTEGER NOT NULL,
@@ -241,22 +262,25 @@ def stops_table(conn):
     	lat REAL NOT NULL,
     	long REAL NOT NULL,
     	wheelchair INTEGER NOT NULL
-    );"""
-    cursor.execute(sql)
+    );""")
     print("Initialised table stops")
 
     print("Inserting in table Stops")
-    chunk = []
-    with open("stops.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/stops.txt", "r", encoding="utf-8") as file:
         file.readline()
-        for line in file:
-            tokens = line.split(",")
-            chunk.append((tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[8]))
-        sql = "INSERT INTO Stops (stop_id,stop_code,stop_name,lat,long,wheelchair) VALUES (%s,%s,%s,%s,%s,%s);"
-
-        #cursor.execute("BEGIN;")
-        cursor.executemany(sql, chunk)
+        cursor.copy_expert(
+            "COPY TMP_Stops FROM STDIN WITH CSV",
+            file
+        )
         conn.commit()
+        print("Successfully inserted into tmp table\n")
+
+    cursor.execute("""
+        INSERT INTO Stops (stop_id,stop_code,stop_name,lat,long,wheelchair)
+        SELECT stop_id,stop_code,stop_name,stop_lat,stop_lon,wheelchair_boarding
+        FROM TMP_Stops;"""
+    )
+
     print("Successfully inserted table\n")
 
     cursor.close()
@@ -264,7 +288,17 @@ def stops_table(conn):
 
 def trips_table(conn):
     cursor = conn.cursor()
-
+    cursor.execute("""CREATE TEMP TABLE TMP_Trips (
+        route_id INTEGER NOT NULL,
+        service_id TEXT NOT NULL,
+        trip_id INTEGER NOT NULL,
+        trip_headsign TEXT NOT NULL,
+        direction_id INTEGER NOT NULL,
+        shape_id INTEGER NOT NULL,
+        wheelchair_accessible INTEGER NOT NULL,
+        note_fr TEXT,
+        note_en TEXT
+    );""")
     # init the table
     query = """CREATE TABLE Trips (
     	id SERIAL PRIMARY KEY NOT NULL,
@@ -279,24 +313,22 @@ def trips_table(conn):
     cursor.execute(query)
 
     print("Inserting in table Trips and adding data")
-    chunk_size = 500000
-    with open("trips.txt", "r", encoding="utf-8") as file:
+    with open(f"{directory}/trips.txt", "r", encoding="utf-8") as file:
         file.readline()
-        chunk = []
-        i = 1
-        for line in file:
-            tokens = line.split(",")
-            chunk.append((tokens[2],tokens[0],tokens[1],tokens[3],tokens[4],tokens[5],tokens[6]))
-            sql = "INSERT INTO Trips (trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible) VALUES (%s,%s,%s,%s,%s,%s,%s);"
-            if len(chunk) >= chunk_size:
-                print(f"Created chunk #{i}. Executing query")
-                cursor.executemany(sql, chunk)
-                conn.commit()
-                chunk = []
-        if not chunk is None:
-            print("Executing final query")
-            cursor.executemany(sql, chunk)
-            conn.commit()
+        cursor.copy_expert(
+            "COPY TMP_Trips FROM STDIN WITH CSV", 
+            file
+        )
+        conn.commit()
+        print("Successfully inserted into tmp table\n")
+
+    cursor.execute("""
+        INSERT INTO Trips (trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible)
+        SELECT trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible
+        FROM TMP_Trips;"""
+    )
+    conn.commit()
+
     print("Successfully inserted table\n")
     cursor.close()
 
@@ -366,8 +398,6 @@ def map_table(conn):
 
 def main():
     parser = argparse.ArgumentParser(description='Script to migrate from an sqlite3 database to a postgres database, to better handle concurrency tasks')
-    parser.add_argument('-U', '--user', nargs=1, required=True, help='Username of the choosen database')
-    parser.add_argument('-P', '--password', nargs=1, required=True, help='Password for the username')
     parser.add_argument('--no-download', action='store_true', help='Do not download the required files')
 
     args = parser.parse_args()
@@ -375,7 +405,7 @@ def main():
     if not args.no_download:
         download("https://www.stm.info/sites/default/files/gtfs/gtfs_stm.zip")
 
-    init_database(args.user[0], args.password[0])
+    init_database()
 
 
 if __name__ == "__main__":
