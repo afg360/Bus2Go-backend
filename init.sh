@@ -1,5 +1,6 @@
 #!/bin/sh
 
+#FIXME
 
 if [ ! -f "./stm_info.db" ]; then
 	echo "You did not initialise the database!"

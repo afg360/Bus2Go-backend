@@ -1,4 +1,5 @@
 # Check if stm_info.db file exists
+# FIXME
 if (-not (Test-Path "./stm_info.db")) {
     echo "You did not initialise the database!"
     echo "Aborting"

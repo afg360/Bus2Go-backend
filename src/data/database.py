@@ -1,83 +1,66 @@
-import gtfs_realtime_pb2
 import asyncpg
 import asyncio
 import aiohttp
 import time
-#for testing purposes
+from typing import Self
+
+from . import gtfs_realtime_pb2
+#if settings.DEBUG_MODE:
 import random
-
-from enum import Enum
-from pydantic import BaseModel
-
-class Agency(str, Enum):
-    STM = "STM"
-    EXO = "EXO_OTHER"
-    TRAIN = "EXO_TRAIN"
+from ..models import Agency, TransitInfo, TransitTime
+from ..settings import settings, logger
 
 
-class TransitInfo(BaseModel):
-    agency: Agency
-    route_id: str
-    trip_headsign: str
-    stop_name: str
-
-
-class TransitTime(BaseModel):
-    transit_info: TransitInfo
-    arrival_time: list[int] | str | None
-
-
-async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | int | None:
+async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:
     tokens = {}
     url = "https://api.stm.info/pub/od/gtfs-rt/ic/v2/tripUpdates"
-    with open("./.env", "r") as file:
-        for line in file:
-            #pdb.set_trace()
-            line = line.rsplit()[0]
-            info = line.split('=')
-            tokens[info[0]] = info[1]
     async with aiohttp.ClientSession() as session:
         try:
-            async with await session.get(url, headers={"apiKey": tokens["stm_token"]}) as response:
+            async with await session.get(url, headers={"apiKey": settings.STM_TOKEN}) as response:
                 if response.status == 200:
                     feed = gtfs_realtime_pb2.FeedMessage()
                     feed.ParseFromString(await response.read())
                     return feed.entity
                 else:
-                    pass
+                    return
         except aiohttp.client_exceptions.ClientConnectorError:
-            return 1
+            return
 
 
 class Database():
-    def __init__(self, connection_pool = None, debug = None):
-        self.__connection_pool = connection_pool
-        self.__debug = debug
+    __instance: Self | None = None
+    __initialized: bool = False
+    __connection_pool: asyncpg.Pool | None = None
+    
+    def __new__(cls):
+        if cls.__instance is None:
+            cls.__instance = super(Database, cls).__new__(cls)
+        return cls.__instance
 
-    @classmethod
-    async def create(cls, username: str, password: str, debug: bool =  False):
-        self = cls()
-        self.__connection_pool = await asyncpg.create_pool(
-            database="bus2go",
-            user=username,
-            password=password,
-        )
-        #await self.__connection_pool.set_client_encoding('UTF8')
-        print(self.__connection_pool)
-        self.__debug = debug
-        return self
+    async def init(self, database: str, username: str, password: str):
+        if not self.__initialized:
+            self.__connection_pool = await asyncpg.create_pool(
+                database = database,
+                user = username,
+                password = password,
+            )
 
     # send a flag to signal last time database has been updated
     async def updateTimes(self) -> None:
+        if not self.__initialized:
+            raise AssertionError("Expected database to be initialised")
+
         if self.__connection_pool is None:
             raise TypeError
+
         query = """UPDATE Map SET arrival_time = $1 WHERE 
         trip_id = $2 AND route_id = $3 AND direction_id = $4 
         AND stop_id = $5;
         """
         data = await get_new_realtime_data()
         if data is None:
-            raise AssertionError("Error trying to parse the feed message. Aborting")
+            logger.error("Error trying to parse the feed message.", stack_info = True)
+            #raise AssertionError("")
             #add some log message
             return
         elif data == 1:
@@ -95,11 +78,11 @@ class Database():
                                        trip_update.trip.route_id, 
                                        trip_update.trip.direction_id, 
                                        stop_time.stop_id))
-            async with self.__connection_pool.acquire() as connection: #type: ignore
+            async with self.__connection_pool.acquire() as connection:
                 async with connection.transaction():
                     await connection.executemany(query, chunk)
                     chunk = []
-                    if self.__debug:
+                    if settings.DEBUG_MODE:
                         print(f"Committed chunk#{i}")
                     i += 1
 
@@ -155,9 +138,10 @@ class Database():
         await self.__connection_pool.close()
 
 
+database = Database()
+#asyncio.run(database.init("dabawss", ""))
+
 async def test() -> None:
-    #get username from environment variables
-    database = await Database.create("dabawss", "", True)
     """
     jobs = [
        database.getTime("165", "Sud", "Côte-des-Neiges / Mackenzie"), 

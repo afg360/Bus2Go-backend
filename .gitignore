@@ -1,7 +1,8 @@
 /venv
-/__pycache__
+**/__pycache__/
 /data
 /ssl-certs
 .env
+*.proto
 *.log
 *.db
