@@ -20,12 +20,19 @@ app = FastAPI(title = "Bus2Go-realtime",
                 "name": "GPL-3.0",
                 "url": "https://www.gnu.org/licenses/gpl-3.0.en.html",
                 },
-              lifespan = lifespan
+              #disabled for now so that it doesn't pollute logging for now...
+              #lifespan = lifespan
               )
 
 app.include_router(download_router)
 app.include_router(ws_route)
 app.include_router(util_route)
+
+if settings.DEBUG_MODE:
+    from .routes.debug_api import debug_router
+    from .routes.debug_ws import debug_ws_route
+    app.include_router(debug_router)
+    app.include_router(debug_ws_route)
 
 async def test():
     #lst = await get_data_agency(Agency.STM, "165", "Nord", "Côte-des-Neiges / Mackenzie")

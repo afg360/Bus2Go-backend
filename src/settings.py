@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     VERSION: str = "v1"
     SUB_VERSION: str = ".1"
     PROJECT_NAME: str = "bus2go-realtime"
-    DEBUG_MODE: bool = True
     LOG_LEVEL: int = logging.DEBUG
     #from .env
     STM_TOKEN: str
@@ -15,6 +14,7 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_USERNAME: str
     DB_PASSWORD: str
+    DEBUG_MODE: bool
     
 
     def get_full_version(self) -> str:

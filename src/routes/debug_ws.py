@@ -2,7 +2,7 @@ from fastapi import routing
 from fastapi import WebSocket
 from pydantic import BaseModel
 
-from settings import logger
+from ..settings import logger
 
 class Test(BaseModel):
     id : int
