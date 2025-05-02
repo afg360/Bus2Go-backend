@@ -8,13 +8,20 @@ class Settings(BaseSettings):
     SUB_VERSION: str = ".1"
     PROJECT_NAME: str = "bus2go-realtime"
     LOG_LEVEL: int = logging.DEBUG
+
     #from .env
+    HOST: str
+    PORT: int
+    SSL_CERT_PATH: str
+    SSL_KEY_PATH: str
     STM_TOKEN: str
+
     EXO_TOKEN: str
     DB_NAME: str
     DB_USERNAME: str
     DB_PASSWORD: str
     DEBUG_MODE: bool
+
     
 
     def get_full_version(self) -> str:

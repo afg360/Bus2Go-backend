@@ -48,22 +48,24 @@ def init_database() -> None:
         # to manually commit and allow usage of vacuuming
         conn.autocommit = True
         cursor = conn.cursor()
-        cursor.execute("DROP TABLE IF EXISTS Calendar CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS Forms CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS Routes CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS Shapes CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS StopsInfo CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS StopTimes CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS Stops CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS Trips CASCADE;")
-        cursor.execute("DROP INDEX IF EXISTS TripsIndex CASCADE;")
-        cursor.execute("DROP TABLE IF EXISTS Map CASCADE;")
+        cursor.execute('DROP TABLE IF EXISTS "Calendar" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "CalendarDates" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "Forms" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "Routes" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "Shapes" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "StopsInfo" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "StopTimes" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "Stops" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "Trips" CASCADE;')
+        cursor.execute('DROP INDEX IF EXISTS "TripsIndex" CASCADE;')
+        cursor.execute('DROP TABLE IF EXISTS "Map" CASCADE;')
 
-        cursor.execute("DROP INDEX IF EXISTS StopsInfoIndex;")
-        cursor.execute("DROP INDEX IF EXISTS StopTimesIndex;")
-        cursor.execute("DROP INDEX IF EXISTS MapIndex;")
+        cursor.execute('DROP INDEX IF EXISTS "StopsInfoIndex";')
+        cursor.execute('DROP INDEX IF EXISTS "StopTimesIndex";')
+        cursor.execute('DROP INDEX IF EXISTS "MapIndex";')
 
         calendar_table(conn)
+        calendar_dates_table(conn)
         route_table(conn)
         forms_table(conn)
         shapes_table(conn)
@@ -91,9 +93,8 @@ def init_database() -> None:
 def calendar_table(conn):
     cursor = conn.cursor()
 
-    sql = """CREATE TABLE Calendar (
-    	id SERIAL PRIMARY KEY,
-    	service_id TEXT UNIQUE NOT NULL,
+    sql = """CREATE TABLE "Calendar" (
+    	service_id TEXT PRIMARY KEY NOT NULL,
         days VARCHAR(7) NOT NULL,
     	start_date INTEGER NOT NULL,
     	end_date INTEGER NOT NULL
@@ -122,9 +123,33 @@ def calendar_table(conn):
                 days += "s"
             if tokens[7] == "1":
                 days += "d"
-            sql = f"INSERT INTO Calendar (service_id,days,start_date,end_date) VALUES (%s,%s,%s,%s);"
+            sql = f'INSERT INTO "Calendar" (service_id,days,start_date,end_date) VALUES (%s,%s,%s,%s);'
             cursor.execute(sql, (tokens[0], days, tokens[8], tokens[9]))
             conn.commit()
+    print("Successfully inserted table\n")
+    cursor.close()
+
+def calendar_dates_table(conn):
+    cursor = conn.cursor()
+    sql = """CREATE TABLE "CalendarDates"(
+    	service_id TEXT REFERENCES "Calendar"(service_id) NOT NULL,
+        date TEXT NOT NULL,
+        exception_type INTEGER NOT NULL,
+        PRIMARY KEY (service_id, date)
+        );
+    """
+    cursor.execute(sql)
+    print("Initialised table CalendarDates")
+
+    print("Inserting in table CalendarDates")
+    queries = []
+    with open(f"{directory}/calendar_dates.txt", "r", encoding="utf-8") as file:
+        file.readline()
+        cursor.copy_expert(
+            'COPY "CalendarDates" (service_id, date, exception_type) FROM STDIN WITH CSV',
+            file
+        )
+        conn.commit()
     print("Successfully inserted table\n")
     cursor.close()
 
@@ -132,7 +157,7 @@ def calendar_table(conn):
 def forms_table(conn):
     cursor = conn.cursor()
 
-    sql = """CREATE TABLE Forms(
+    sql = """CREATE TABLE "Forms"(
     	id SERIAL PRIMARY KEY NOT NULL,
     	shape_id INTEGER UNIQUE NOT NULL
     );"""
@@ -150,7 +175,7 @@ def forms_table(conn):
             if not shape_id == prev:
                 queries.append((tokens[0],))
                 prev = shape_id
-        sql = "INSERT INTO Forms (shape_id) VALUES (%s);"
+        sql = 'INSERT INTO "Forms" (shape_id) VALUES (%s);'
         #cursor.execute("BEGIN;")
         cursor.executemany(sql, queries)
         conn.commit()
@@ -162,7 +187,7 @@ def forms_table(conn):
 def route_table(conn):
     cursor = conn.cursor()
 
-    sql = """CREATE TABLE Routes (
+    sql = """CREATE TABLE "Routes" (
     	id SERIAL PRIMARY KEY NOT NULL,
     	route_id INTEGER UNIQUE NOT NULL,
     	route_long_name TEXT NOT NULL,
@@ -177,7 +202,7 @@ def route_table(conn):
         file.readline()
         for line in file:
             tokens = line.replace("\n", "").replace("'", "''").split(",")
-            sql = "INSERT INTO Routes (route_id,route_long_name,route_type,route_color) VALUES (%s,%s,%s,%s);"
+            sql = 'INSERT INTO "Routes" (route_id,route_long_name,route_type,route_color) VALUES (%s,%s,%s,%s);'
             cursor.execute(sql, (tokens[0],tokens[3],tokens[4],tokens[6]))
             conn.commit()
     print("Successfully inserted table\n")
@@ -187,9 +212,9 @@ def route_table(conn):
 
 def shapes_table(conn):
     cursor = conn.cursor()
-    sql = """CREATE TABLE Shapes(
+    sql = """CREATE TABLE "Shapes"(
     	id SERIAL PRIMARY KEY,
-    	shape_id INTEGER NOT NULL REFERENCES Forms(shape_id),
+    	shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
     	lat REAL NOT NULL,
     	long REAL NOT NULL,
     	sequence INTEGER NOT NULL
@@ -202,7 +227,7 @@ def shapes_table(conn):
     with open(f"{directory}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
         cursor.copy_expert(
-            "COPY Shapes (shape_id,lat,long,sequence) FROM STDIN WITH CSV",
+            'COPY "Shapes" (shape_id,lat,long,sequence) FROM STDIN WITH CSV',
             file
         )
         conn.commit()
@@ -214,12 +239,12 @@ def stop_times_table(conn):
     cursor = conn.cursor()
 
     # init the table
-    query = """CREATE TABLE StopTimes (
+    query = """CREATE TABLE "StopTimes" (
     	id SERIAL PRIMARY KEY,
     	trip_id INTEGER NOT NULL,
     	arrival_time TEXT NOT NULL,
     	departure_time TEXT NOT NULL,
-    	stop_id TEXT NOT NULL REFERENCES Stops(stop_id),
+    	stop_id TEXT NOT NULL REFERENCES "Stops"(stop_id),
     	stop_seq INTEGER NOT NULL
     );
     """
@@ -228,10 +253,10 @@ def stop_times_table(conn):
     print("Inserting table and adding data")
 
     with open(f"{directory}/stop_times.txt", "r", encoding="utf-8") as file:
-        cursor.copy_expert("COPY StopTimes(trip_id, arrival_time, departure_time, stop_id, stop_seq) FROM STDIN CSV HEADER;", file)
+        cursor.copy_expert('COPY "StopTimes"(trip_id, arrival_time, departure_time, stop_id, stop_seq) FROM STDIN CSV HEADER;', file)
         conn.commit()
 
-    query = "CREATE INDEX StopTimesIndex ON StopTimes(stop_id,trip_id);"
+    query = 'CREATE INDEX "StopTimesIndex" ON "StopTimes"(stop_id,trip_id);'
     print("Creating index for StopTimes on stopid and tripid")
     cursor.execute(query)
     print("Successfully created index for table StopTimes\n")
@@ -254,7 +279,7 @@ def stops_table(conn):
     )
     """)
 
-    cursor.execute("""CREATE TABLE Stops (
+    cursor.execute("""CREATE TABLE "Stops" (
     	id SERIAL PRIMARY KEY NOT NULL,
     	stop_id TEXT UNIQUE NOT NULL,
     	stop_code INTEGER NOT NULL,
@@ -273,10 +298,10 @@ def stops_table(conn):
             file
         )
         conn.commit()
-        print("Successfully inserted into tmp table\n")
+        print("Successfully inserted into tmp table")
 
     cursor.execute("""
-        INSERT INTO Stops (stop_id,stop_code,stop_name,lat,long,wheelchair)
+        INSERT INTO "Stops" (stop_id,stop_code,stop_name,lat,long,wheelchair)
         SELECT stop_id,stop_code,stop_name,stop_lat,stop_lon,wheelchair_boarding
         FROM TMP_Stops;"""
     )
@@ -300,14 +325,14 @@ def trips_table(conn):
         note_en TEXT
     );""")
     # init the table
-    query = """CREATE TABLE Trips (
+    query = """CREATE TABLE "Trips" (
     	id SERIAL PRIMARY KEY NOT NULL,
     	trip_id INTEGER NOT NULL,
-    	route_id INTEGER NOT NULL REFERENCES Routes(route_id),
-    	service_id TEXT NOT NULL REFERENCES Calendar(service_id),
+    	route_id INTEGER NOT NULL REFERENCES "Routes"(route_id),
+    	service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
     	trip_headsign TEXT NOT NULL,
     	direction_id INTEGER NOT NULL,
-    	shape_id INTEGER NOT NULL REFERENCES Forms(shape_id),
+    	shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
     	wheelchair_accessible INTEGER NOT NULL
     );"""
     cursor.execute(query)
@@ -323,7 +348,7 @@ def trips_table(conn):
         print("Successfully inserted into tmp table\n")
 
     cursor.execute("""
-        INSERT INTO Trips (trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible)
+        INSERT INTO "Trips" (trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible)
         SELECT trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible
         FROM TMP_Trips;"""
     )
@@ -335,12 +360,12 @@ def trips_table(conn):
 
 def stops_info_table(conn):
     cursor = conn.cursor()
-    create = """CREATE TABLE IF NOT EXISTS StopsInfo(
+    create = """CREATE TABLE IF NOT EXISTS "StopsInfo"(
     id SERIAL PRIMARY KEY,
     stop_name TEXT NOT NULL,
     route_id INTEGER NOT NULL,
     trip_headsign TEXT NOT NULL,
-    days TEXT NOT NULL,
+    service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
     arrival_time TEXT NOT NULL,
     stop_seq INTEGER NOT NULL
     );
@@ -348,11 +373,11 @@ def stops_info_table(conn):
     print("Creating table StopsInfo")
     cursor.execute(create)
 
-    sql = """INSERT INTO StopsInfo(stop_name,route_id,trip_headsign,days,arrival_time,stop_seq)
-    SELECT stops.stop_name,trips.route_id,trips.trip_headsign,calendar.days,arrival_time,stoptimes.stop_seq
-    FROM stoptimes JOIN trips ON stoptimes.trip_id = trips.trip_id
-    JOIN calendar ON calendar.service_id = trips.service_id
-    JOIN stops ON stoptimes.stop_id = stops.stop_id;
+    sql = """INSERT INTO "StopsInfo"(stop_name,route_id,trip_headsign,service_id,arrival_time,stop_seq)
+    SELECT "Stops".stop_name,"Trips".route_id,"Trips".trip_headsign,"Calendar".service_id,arrival_time,"StopTimes".stop_seq
+    FROM "StopTimes" JOIN "Trips" ON "StopTimes".trip_id = "Trips".trip_id
+    JOIN "Calendar" ON "Calendar".service_id = "Trips".service_id
+    JOIN "Stops" ON "StopTimes".stop_id = "Stops".stop_id;
     """
     print("Inserting in table StopsInfo")
     cursor.execute(sql)
@@ -361,14 +386,14 @@ def stops_info_table(conn):
     cursor.execute("VACUUM FULL;")
 
     print("Creating index on StopsInfo")
-    cursor.execute("CREATE INDEX StopsInfoIndex ON StopsInfo(route_id,stop_name);")
+    cursor.execute('CREATE INDEX "StopsInfoIndex" ON "StopsInfo"(route_id,stop_name);')
 
     cursor.close()
 
 
 def map_table(conn):
     cursor = conn.cursor()
-    query = """CREATE TABLE Map (
+    query = """CREATE TABLE "Map" (
         id SERIAL PRIMARY KEY,
         trip_id INTEGER NOT NULL,
         trip_headsign TEXT NOT NULL, --i.e. direction
@@ -383,13 +408,16 @@ def map_table(conn):
     cursor.execute(query)
     print("\nInitialised table Map")
     print("Inserting table and adding data")
-    #cursor.execute("BEGIN;")
-    sql = """INSERT INTO Map(trip_id, trip_headsign, route_id, stop_name, stop_id, stop_seq, direction_id, arrival_time) SELECT Trips.trip_id, Trips.trip_headsign, Trips.route_id, Stops.stop_name, Stops.stop_id, StopsInfo.stop_seq, direction_id, 0 FROM (SELECT DISTINCT stop_name, route_id, trip_headsign, stop_seq FROM StopsInfo) AS StopsInfo JOIN Trips on Trips.trip_headsign = StopsInfo.trip_headsign AND Trips.route_id = StopsInfo.route_id JOIN Stops ON Stops.stop_name = StopsInfo.stop_name;"""
+    sql = """INSERT INTO "Map"(trip_id, trip_headsign, route_id, stop_name, stop_id, stop_seq, direction_id, arrival_time) 
+    SELECT "Trips".trip_id, "Trips".trip_headsign, "Trips".route_id, "Stops".stop_name, "Stops".stop_id, "StopsInfo".stop_seq, direction_id, 0 
+    FROM (SELECT DISTINCT stop_name, route_id, trip_headsign, stop_seq FROM "StopsInfo") AS "StopsInfo" 
+    JOIN "Trips" on "Trips".trip_headsign = "StopsInfo".trip_headsign AND "Trips".route_id = "StopsInfo".route_id 
+    JOIN "Stops" ON "Stops".stop_name = "StopsInfo".stop_name;"""
     cursor.execute(sql)
     conn.commit()
     print("Successfully inserted data in table Map\n")
 
-    query = "CREATE INDEX MapIndex ON Map(trip_id,route_id,stop_id,direction_id);"
+    query = 'CREATE INDEX "MapIndex" ON "Map"(trip_id,route_id,stop_id,direction_id);'
     print("Creating index for Map on trip_id, route_id, stop_id and direction_id")
     cursor.execute(query)
     print("Successfully created index for table Map\n")
