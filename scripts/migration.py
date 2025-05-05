@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-import psycopg2
+import asyncio
+import aiohttp
+import asyncpg
 import argparse
 import requests
 import zipfile
@@ -36,237 +38,215 @@ def download(url : str): #destination : str) -> None:
         print(f"Failed to download {url}")
 
 
-def init_database() -> None:
+async def init_database() -> None:
     """Initialise the data in the database associated to that agency"""
     try:
-        conn = psycopg2.connect(
+        conn = await asyncpg.connect(
             database = settings.DB_NAME,
             user = settings.DB_USERNAME,
             password = settings.DB_PASSWORD
         )
-        conn.set_client_encoding("UTF8")
-        # to manually commit and allow usage of vacuuming
-        conn.autocommit = True
-        cursor = conn.cursor()
-        cursor.execute('DROP TABLE IF EXISTS "Calendar" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "CalendarDates" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "Forms" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "Routes" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "Shapes" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "StopsInfo" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "StopTimes" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "Stops" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "Trips" CASCADE;')
-        cursor.execute('DROP INDEX IF EXISTS "TripsIndex" CASCADE;')
-        cursor.execute('DROP TABLE IF EXISTS "Map" CASCADE;')
+        
+        await conn.execute("SET client_encoding TO 'UTF8'")
+        await conn.execute('DROP TABLE IF EXISTS "Calendar" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "CalendarDates" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "Forms" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "Routes" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "Shapes" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "StopsInfo" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "StopTimes" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "Stops" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "Trips" CASCADE;')
+        await conn.execute('DROP INDEX IF EXISTS "TripsIndex" CASCADE;')
+        await conn.execute('DROP TABLE IF EXISTS "Map" CASCADE;')
+        await conn.execute('DROP INDEX IF EXISTS "StopsInfoIndex";')
+        await conn.execute('DROP INDEX IF EXISTS "StopTimesIndex";')
+        await conn.execute('DROP INDEX IF EXISTS "MapIndex";')
 
-        cursor.execute('DROP INDEX IF EXISTS "StopsInfoIndex";')
-        cursor.execute('DROP INDEX IF EXISTS "StopTimesIndex";')
-        cursor.execute('DROP INDEX IF EXISTS "MapIndex";')
+        await calendar_table(conn)
+        await calendar_dates_table(conn)
+        await route_table(conn)
+        await forms_table(conn)
+        await shapes_table(conn)
+        await trips_table(conn)
+        await stops_table(conn)
+        await stop_times_table(conn)
+        await stops_info_table(conn)
+        await map_table(conn)
 
-        calendar_table(conn)
-        calendar_dates_table(conn)
-        route_table(conn)
-        forms_table(conn)
-        shapes_table(conn)
-        trips_table(conn)
-        stops_table(conn)
-        stop_times_table(conn)
-        stops_info_table(conn)
-        map_table(conn)
-
-        conn.close()
+        await conn.close()
 
         answer = input("Do you want to clean up the directory from txt files? (y/n) ")
-        if answer == "yes" or "y":
+        if answer == "yes" or answer == "y":
             print("Cleaning up")
-            os.remove(f"{directory}/*.txt")
+            dir_content = os.listdir(directory)
+            for content in dir_content:
+                if os.path.isfile(content) and content.endswith(".txt"):
+                    os.remove(f"{directory}/*.txt")
             print("Cleaned up")
         else:
             print("Not cleaning up")
 
-    except psycopg2.OperationalError:
+    except asyncpg.PostgresConnectionError:
         print(f"The username {settings.DB_USERNAME} does not exist. Aborting the script.")
         sys.exit(1)
 
 
-def calendar_table(conn):
-    cursor = conn.cursor()
-
-    sql = """CREATE TABLE "Calendar" (
+async def calendar_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "Calendar" (
     	service_id TEXT PRIMARY KEY NOT NULL,
         days VARCHAR(7) NOT NULL,
     	start_date INTEGER NOT NULL,
     	end_date INTEGER NOT NULL
-    );"""
-    cursor.execute(sql)
+        );"""
+    )
     print("Initialised table Calendar")
 
     print("Inserting in table Calendar and adding data")
     with open(f"{directory}/calendar.txt", "r", encoding="utf-8") as file:
         file.readline()
-        for line in file:
-            tokens = line.replace("\n", "").replace("'", "''").split(",")
-            #check all the possible letters
-            days = ""
-            if tokens[1] == "1":
-                days += "m"
-            if tokens[2] == "1":
-                days += "t"
-            if tokens[3] == "1":
-                days += "w"
-            if tokens[4] == "1":
-                days += "y"
-            if tokens[5] == "1":
-                days += "f"
-            if tokens[6] == "1":
-                days += "s"
-            if tokens[7] == "1":
-                days += "d"
-            sql = f'INSERT INTO "Calendar" (service_id,days,start_date,end_date) VALUES (%s,%s,%s,%s);'
-            cursor.execute(sql, (tokens[0], days, tokens[8], tokens[9]))
-            conn.commit()
-    print("Successfully inserted table\n")
-    cursor.close()
+        async with conn.transaction():
 
-def calendar_dates_table(conn):
-    cursor = conn.cursor()
-    sql = """CREATE TABLE "CalendarDates"(
+            for line in file:
+                tokens = line.replace("\n", "").replace("'", "''").split(",")
+                #check all the possible letters
+                days = ""
+                if tokens[1] == "1":
+                    days += "m"
+                if tokens[2] == "1":
+                    days += "t"
+                if tokens[3] == "1":
+                    days += "w"
+                if tokens[4] == "1":
+                    days += "y"
+                if tokens[5] == "1":
+                    days += "f"
+                if tokens[6] == "1":
+                    days += "s"
+                if tokens[7] == "1":
+                    days += "d"
+                sql = f'INSERT INTO "Calendar" (service_id,days,start_date,end_date) VALUES ($1,$2,$3,$4);'
+                await conn.execute(sql, tokens[0], days, int(tokens[8]), int(tokens[9]))
+    print("Successfully inserted table\n")
+
+async def calendar_dates_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "CalendarDates"(
     	service_id TEXT REFERENCES "Calendar"(service_id) NOT NULL,
         date TEXT NOT NULL,
         exception_type INTEGER NOT NULL,
         PRIMARY KEY (service_id, date)
-        );
-    """
-    cursor.execute(sql)
+        );""")
     print("Initialised table CalendarDates")
 
     print("Inserting in table CalendarDates")
-    queries = []
-    with open(f"{directory}/calendar_dates.txt", "r", encoding="utf-8") as file:
-        file.readline()
-        cursor.copy_expert(
-            'COPY "CalendarDates" (service_id, date, exception_type) FROM STDIN WITH CSV',
-            file
+    #asyncpg expects a binary stream, so explicitely state that the data is in csv format
+    with open(f"{directory}/calendar_dates.txt", "rb") as file:
+        await conn.copy_to_table(
+            table_name='CalendarDates',
+            source=file,
+            format="csv",
+            columns=["service_id", "date", "exception_type"],
+            header=True
         )
-        conn.commit()
     print("Successfully inserted table\n")
-    cursor.close()
 
 
-def forms_table(conn):
-    cursor = conn.cursor()
-
-    sql = """CREATE TABLE "Forms"(
+async def forms_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "Forms"(
     	id SERIAL PRIMARY KEY NOT NULL,
     	shape_id INTEGER UNIQUE NOT NULL
-    );"""
-    cursor.execute(sql)
-    print("Initialised table Forms")
-
+        );""")
     print("Inserting in table Forms")
-    queries = []
+    records = []
     with open(f"{directory}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
-        prev = ""
-        for line in file:
-            tokens = line.split(",")
-            shape_id = tokens[0]
-            if not shape_id == prev:
-                queries.append((tokens[0],))
-                prev = shape_id
-        sql = 'INSERT INTO "Forms" (shape_id) VALUES (%s);'
-        #cursor.execute("BEGIN;")
-        cursor.executemany(sql, queries)
-        conn.commit()
+        
+        async with conn.transaction():
+            prev = ""
+            for line in file:
+                tokens = line.split(",")
+                shape_id = tokens[0]
+                if not shape_id == prev:
+                    records.append((int(tokens[0]),))
+                    prev = shape_id
+            sql = 'INSERT INTO "Forms" (shape_id) VALUES ($1);'
+            await conn.executemany(sql, records)
     print("Successfully inserted table\n")
 
-    cursor.close()
 
-
-def route_table(conn):
-    cursor = conn.cursor()
-
-    sql = """CREATE TABLE "Routes" (
-    	id SERIAL PRIMARY KEY NOT NULL,
-    	route_id INTEGER UNIQUE NOT NULL,
-    	route_long_name TEXT NOT NULL,
-    	route_type INTEGER NOT NULL,
-    	route_color TEXT NOT NULL
-    );"""
-    cursor.execute(sql)
+async def route_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "Routes" (
+        id SERIAL PRIMARY KEY NOT NULL,
+        route_id INTEGER UNIQUE NOT NULL,
+        route_long_name TEXT NOT NULL,
+        route_type INTEGER NOT NULL,
+        route_color TEXT NOT NULL
+        );""")
     print("Initialised table routes")
 
     print("Inserting in table Route and adding data")
     with open(f"{directory}/routes.txt", "r", encoding="utf-8") as file:
         file.readline()
-        for line in file:
-            tokens = line.replace("\n", "").replace("'", "''").split(",")
-            sql = 'INSERT INTO "Routes" (route_id,route_long_name,route_type,route_color) VALUES (%s,%s,%s,%s);'
-            cursor.execute(sql, (tokens[0],tokens[3],tokens[4],tokens[6]))
-            conn.commit()
+        records = []
+        async with conn.transaction():
+            for line in file:
+                tokens = line.replace("\n", "").replace("'", "''").split(",")
+                records.append((int(tokens[0]), tokens[3], int(tokens[4]), tokens[6]))
+            sql = 'INSERT INTO "Routes" (route_id,route_long_name,route_type,route_color) VALUES ($1,$2,$3,$4);'
+            await conn.executemany(sql, records)
     print("Successfully inserted table\n")
 
-    cursor.close()
 
-
-def shapes_table(conn):
-    cursor = conn.cursor()
-    sql = """CREATE TABLE "Shapes"(
-    	id SERIAL PRIMARY KEY,
-    	shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
-    	lat REAL NOT NULL,
-    	long REAL NOT NULL,
-    	sequence INTEGER NOT NULL
-    );"""
-    cursor.execute(sql)
+async def shapes_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "Shapes"(
+        id SERIAL PRIMARY KEY,
+        shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
+        lat REAL NOT NULL,
+        long REAL NOT NULL,
+        sequence INTEGER NOT NULL
+    );""")
     print("Initialised table shapes")
 
     print("Inserting in table Shapes")
-    queries = []
-    with open(f"{directory}/shapes.txt", "r", encoding="utf-8") as file:
-        file.readline()
-        cursor.copy_expert(
-            'COPY "Shapes" (shape_id,lat,long,sequence) FROM STDIN WITH CSV',
-            file
+    with open(f"{directory}/shapes.txt", "rb") as file:
+        await conn.copy_to_table(
+            table_name="Shapes",
+            source=file,
+            format="csv",
+            columns=["shape_id", "lat", "long", "sequence"],
+            header=True
         )
-        conn.commit()
     print("Successfully inserted table\n")
-    cursor.close()
 
 
-def stop_times_table(conn):
-    cursor = conn.cursor()
-
-    # init the table
-    query = """CREATE TABLE "StopTimes" (
-    	id SERIAL PRIMARY KEY,
-    	trip_id INTEGER NOT NULL,
-    	arrival_time TEXT NOT NULL,
-    	departure_time TEXT NOT NULL,
-    	stop_id TEXT NOT NULL REFERENCES "Stops"(stop_id),
-    	stop_seq INTEGER NOT NULL
-    );
-    """
-    cursor.execute(query)
+async def stop_times_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "StopTimes" (
+        id SERIAL PRIMARY KEY,
+        trip_id INTEGER NOT NULL,
+        arrival_time TEXT NOT NULL,
+        departure_time TEXT NOT NULL,
+        stop_id TEXT NOT NULL REFERENCES "Stops"(stop_id),
+        stop_seq INTEGER NOT NULL
+    ); """)
     print("Initialised tmp table StopTimes")
+
     print("Inserting table and adding data")
-
-    with open(f"{directory}/stop_times.txt", "r", encoding="utf-8") as file:
-        cursor.copy_expert('COPY "StopTimes"(trip_id, arrival_time, departure_time, stop_id, stop_seq) FROM STDIN CSV HEADER;', file)
-        conn.commit()
-
+    with open(f"{directory}/stop_times.txt", "rb") as file:
+        await conn.copy_to_table(
+            table_name="StopTimes",
+            source=file,
+            format="csv",
+            columns=["trip_id", "arrival_time", "departure_time", "stop_id", "stop_seq"],
+            header=True
+        )
     query = 'CREATE INDEX "StopTimesIndex" ON "StopTimes"(stop_id,trip_id);'
     print("Creating index for StopTimes on stopid and tripid")
-    cursor.execute(query)
+    await conn.execute(query)
     print("Successfully created index for table StopTimes\n")
-    cursor.close()
 
 
-def stops_table(conn):
-    cursor = conn.cursor()
-
-    cursor.execute("""CREATE TEMP TABLE TMP_Stops (
+async def stops_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TEMP TABLE "TMP_Stops"(
         stop_id TEXT UNIQUE NOT NULL,
         stop_code INTEGER NOT NULL,
         stop_name TEXT NOT NULL,
@@ -279,41 +259,40 @@ def stops_table(conn):
     )
     """)
 
-    cursor.execute("""CREATE TABLE "Stops" (
-    	id SERIAL PRIMARY KEY NOT NULL,
-    	stop_id TEXT UNIQUE NOT NULL,
-    	stop_code INTEGER NOT NULL,
-    	stop_name TEXT NOT NULL,
-    	lat REAL NOT NULL,
-    	long REAL NOT NULL,
-    	wheelchair INTEGER NOT NULL
+    await conn.execute("""CREATE TABLE "Stops" (
+        id SERIAL PRIMARY KEY NOT NULL,
+        stop_id TEXT UNIQUE NOT NULL,
+        stop_code INTEGER NOT NULL,
+        stop_name TEXT NOT NULL,
+        lat REAL NOT NULL,
+        long REAL NOT NULL,
+        wheelchair INTEGER NOT NULL
     );""")
     print("Initialised table stops")
 
     print("Inserting in table Stops")
-    with open(f"{directory}/stops.txt", "r", encoding="utf-8") as file:
-        file.readline()
-        cursor.copy_expert(
-            "COPY TMP_Stops FROM STDIN WITH CSV",
-            file
+    with open(f"{directory}/stops.txt", "rb") as file:
+        await conn.copy_to_table(
+            table_name='TMP_Stops',
+            source=file,
+            format="csv",
+            columns=["stop_id", "stop_code", "stop_name", "stop_lat", "stop_lon", "stop_url", "location_type", "parent_station", "wheelchair_boarding"],
+            header=True
         )
-        conn.commit()
         print("Successfully inserted into tmp table")
 
-    cursor.execute("""
-        INSERT INTO "Stops" (stop_id,stop_code,stop_name,lat,long,wheelchair)
-        SELECT stop_id,stop_code,stop_name,stop_lat,stop_lon,wheelchair_boarding
-        FROM TMP_Stops;"""
-    )
+    async with conn.transaction():
+        await conn.execute("""
+            INSERT INTO "Stops" (stop_id,stop_code,stop_name,lat,long,wheelchair)
+            SELECT stop_id,stop_code,stop_name,stop_lat,stop_lon,wheelchair_boarding
+            FROM "TMP_Stops";"""
+        )
 
     print("Successfully inserted table\n")
 
-    cursor.close()
 
-
-def trips_table(conn):
-    cursor = conn.cursor()
-    cursor.execute("""CREATE TEMP TABLE TMP_Trips (
+async def trips_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TEMP TABLE "TMP_Trips"(
         route_id INTEGER NOT NULL,
         service_id TEXT NOT NULL,
         trip_id INTEGER NOT NULL,
@@ -324,76 +303,67 @@ def trips_table(conn):
         note_fr TEXT,
         note_en TEXT
     );""")
-    # init the table
-    query = """CREATE TABLE "Trips" (
-    	id SERIAL PRIMARY KEY NOT NULL,
-    	trip_id INTEGER NOT NULL,
-    	route_id INTEGER NOT NULL REFERENCES "Routes"(route_id),
-    	service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
-    	trip_headsign TEXT NOT NULL,
-    	direction_id INTEGER NOT NULL,
-    	shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
-    	wheelchair_accessible INTEGER NOT NULL
-    );"""
-    cursor.execute(query)
+    await conn.execute("""CREATE TABLE "Trips" (
+        id SERIAL PRIMARY KEY NOT NULL,
+        trip_id INTEGER NOT NULL,
+        route_id INTEGER NOT NULL REFERENCES "Routes"(route_id),
+        service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
+        trip_headsign TEXT NOT NULL,
+        direction_id INTEGER NOT NULL,
+        shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
+        wheelchair_accessible INTEGER NOT NULL
+    );""")
 
     print("Inserting in table Trips and adding data")
-    with open(f"{directory}/trips.txt", "r", encoding="utf-8") as file:
-        file.readline()
-        cursor.copy_expert(
-            "COPY TMP_Trips FROM STDIN WITH CSV", 
-            file
+    with open(f"{directory}/trips.txt", "rb") as file:
+        await conn.copy_to_table(
+            table_name='TMP_Trips',
+            source=file,
+            format="csv",
+            columns=["route_id", "service_id", "trip_id", "trip_headsign", "direction_id", "shape_id", "wheelchair_accessible", "note_fr", "note_en"],
+            header=True
         )
-        conn.commit()
         print("Successfully inserted into tmp table\n")
 
-    cursor.execute("""
-        INSERT INTO "Trips" (trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible)
-        SELECT trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible
-        FROM TMP_Trips;"""
-    )
-    conn.commit()
+    async with conn.transaction():
+        await conn.execute("""
+            INSERT INTO "Trips" (trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible)
+            SELECT trip_id,route_id,service_id,trip_headsign,direction_id,shape_id,wheelchair_accessible
+            FROM "TMP_Trips";""")
 
     print("Successfully inserted table\n")
-    cursor.close()
 
 
-def stops_info_table(conn):
-    cursor = conn.cursor()
-    create = """CREATE TABLE IF NOT EXISTS "StopsInfo"(
-    id SERIAL PRIMARY KEY,
-    stop_name TEXT NOT NULL,
-    route_id INTEGER NOT NULL,
-    trip_headsign TEXT NOT NULL,
-    service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
-    arrival_time TEXT NOT NULL,
-    stop_seq INTEGER NOT NULL
-    );
-    """
-    print("Creating table StopsInfo")
-    cursor.execute(create)
+async def stops_info_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE IF NOT EXISTS "StopsInfo"(
+        id SERIAL PRIMARY KEY,
+        stop_name TEXT NOT NULL,
+        route_id INTEGER NOT NULL,
+        trip_headsign TEXT NOT NULL,
+        service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
+        arrival_time TEXT NOT NULL,
+        stop_seq INTEGER NOT NULL
+        ); """)
+    print("Created table StopsInfo")
 
-    sql = """INSERT INTO "StopsInfo"(stop_name,route_id,trip_headsign,service_id,arrival_time,stop_seq)
-    SELECT "Stops".stop_name,"Trips".route_id,"Trips".trip_headsign,"Calendar".service_id,arrival_time,"StopTimes".stop_seq
-    FROM "StopTimes" JOIN "Trips" ON "StopTimes".trip_id = "Trips".trip_id
-    JOIN "Calendar" ON "Calendar".service_id = "Trips".service_id
-    JOIN "Stops" ON "StopTimes".stop_id = "Stops".stop_id;
-    """
     print("Inserting in table StopsInfo")
-    cursor.execute(sql)
+    async with conn.transaction():
+        await conn.execute("""INSERT INTO "StopsInfo"(stop_name,route_id,trip_headsign,service_id,arrival_time,stop_seq)
+        SELECT "Stops".stop_name,"Trips".route_id,"Trips".trip_headsign,"Calendar".service_id,arrival_time,"StopTimes".stop_seq
+        FROM "StopTimes" JOIN "Trips" ON "StopTimes".trip_id = "Trips".trip_id
+        JOIN "Calendar" ON "Calendar".service_id = "Trips".service_id
+        JOIN "Stops" ON "StopTimes".stop_id = "Stops".stop_id;
+        """)
 
     print("Vacuuming database")
-    cursor.execute("VACUUM FULL;")
+    await conn.execute("VACUUM FULL;")
 
     print("Creating index on StopsInfo")
-    cursor.execute('CREATE INDEX "StopsInfoIndex" ON "StopsInfo"(route_id,stop_name);')
-
-    cursor.close()
+    await conn.execute('CREATE INDEX "StopsInfoIndex" ON "StopsInfo"(route_id,stop_name);')
 
 
-def map_table(conn):
-    cursor = conn.cursor()
-    query = """CREATE TABLE "Map" (
+async def map_table(conn: asyncpg.Connection):
+    await conn.execute("""CREATE TABLE "Map" (
         id SERIAL PRIMARY KEY,
         trip_id INTEGER NOT NULL,
         trip_headsign TEXT NOT NULL, --i.e. direction
@@ -403,37 +373,37 @@ def map_table(conn):
         stop_seq INTEGER NOT NULL,
         direction_id INTEGER NOT NULL,
         arrival_time INTEGER NOT NULL
-    );
-    """
-    cursor.execute(query)
+    );""")
     print("\nInitialised table Map")
+
     print("Inserting table and adding data")
-    sql = """INSERT INTO "Map"(trip_id, trip_headsign, route_id, stop_name, stop_id, stop_seq, direction_id, arrival_time) 
-    SELECT "Trips".trip_id, "Trips".trip_headsign, "Trips".route_id, "Stops".stop_name, "Stops".stop_id, "StopsInfo".stop_seq, direction_id, 0 
-    FROM (SELECT DISTINCT stop_name, route_id, trip_headsign, stop_seq FROM "StopsInfo") AS "StopsInfo" 
-    JOIN "Trips" on "Trips".trip_headsign = "StopsInfo".trip_headsign AND "Trips".route_id = "StopsInfo".route_id 
-    JOIN "Stops" ON "Stops".stop_name = "StopsInfo".stop_name;"""
-    cursor.execute(sql)
-    conn.commit()
+    async with conn.transaction():
+        await conn.execute("""INSERT INTO "Map"(trip_id, trip_headsign, route_id, stop_name, stop_id, stop_seq, direction_id, arrival_time) 
+        SELECT "Trips".trip_id, "Trips".trip_headsign, "Trips".route_id, "Stops".stop_name, "Stops".stop_id, "StopsInfo".stop_seq, direction_id, 0 
+        FROM (SELECT DISTINCT stop_name, route_id, trip_headsign, stop_seq FROM "StopsInfo") AS "StopsInfo" 
+        JOIN "Trips" on "Trips".trip_headsign = "StopsInfo".trip_headsign AND "Trips".route_id = "StopsInfo".route_id 
+        JOIN "Stops" ON "Stops".stop_name = "StopsInfo".stop_name;""")
     print("Successfully inserted data in table Map\n")
 
-    query = 'CREATE INDEX "MapIndex" ON "Map"(trip_id,route_id,stop_id,direction_id);'
     print("Creating index for Map on trip_id, route_id, stop_id and direction_id")
-    cursor.execute(query)
+    await conn.execute('CREATE INDEX "MapIndex" ON "Map"(trip_id,route_id,stop_id,direction_id);'
+)
     print("Successfully created index for table Map\n")
-    cursor.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Script to migrate from an sqlite3 database to a postgres database, to better handle concurrency tasks')
-    parser.add_argument('--no-download', action='store_true', help='Do not download the required files')
+    parser = argparse.ArgumentParser(description="Script to migrate from an sqlite3 database to a postgres database, to better handle concurrency tasks")
+
+    parser.add_argument("--stm", "-s", action="store_true", help="Download stm data")
+    parser.add_argument("--exo", "-e", action="store_true", help="Download exo data")
+    parser.add_argument("--no-download", "-n", action="store_true", help="Do not download the required files")
 
     args = parser.parse_args()
 
     if not args.no_download:
         download("https://www.stm.info/sites/default/files/gtfs/gtfs_stm.zip")
 
-    init_database()
+    asyncio.run(init_database())
 
 
 if __name__ == "__main__":
