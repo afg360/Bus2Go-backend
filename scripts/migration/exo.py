@@ -1,50 +1,66 @@
-#!/usr/bin/env python3
-
 import asyncio
 import aiohttp
-import asyncpg
-import argparse
-import requests
 import zipfile
 import os
+import asyncpg
 import sys
-import sys
-from pathlib import Path
 
-src_path = Path(__file__).parents[1]
-sys.path.append(str(src_path))
+__exo_directory = "data/downloads/exo"
+__files = [
+            "citcrc",   #autos Chambly-Richelieu-Carignan
+            "cithsl",   #autos Haut-Saint-Laurent
+            "citla",    #autos Laurentides
+            "citpi",    #autos La Presqu'île
+            "citlr",    #autos Le Richelain
+            "citrous",  #autos Roussillon
+            "citsv",    #autos Sorel-Varennes
+            "citso",    #autos Sud-ouest
+            "citvr",    #autos Vallée du Richelieu
+            "mrclasso", #autos L'Assomption
+            "mrclm",    #autos Terrebonne-Mascouche
+            "trains",
+            "omitsju",  #autos Sainte-Julie
+            "lrrs"      #autos Le Richelain et Roussillon
+    ]
 
-from src import settings
+async def download_exo():
+    """Download and create respective directories"""
+    jobs = [
+        __download(
+            "https://exo.quebec/xdata/" + file + "/google_transit.zip", 
+            f"{__exo_directory}/{file}"
+        ) for file in __files
+    ]
+    await asyncio.gather(*jobs)
+    print(f"Downloaded succesfully")
 
-directory = "data/downloads"
+async def __download(url: str, path: str):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                os.makedirs(path, exist_ok=True)
+                zip_file = f"{path}/data.zip"
+                with open(zip_file, "wb") as file:
+                    chunk_size = 4092
+                    async for chunk in response.content.iter_chunked(chunk_size):
+                        file.write(chunk)
+                print(f"Downloaded {url} to {zip_file} successfully")
+                with zipfile.ZipFile(zip_file, "r") as zip:
+                    zip.extractall(f"{__exo_directory}")
+                print(f"Extracted file from {zip_file}")
+                os.remove(zip_file)
+                print("Removed zip file")
+            else:
+                print(f"Failed to download {url}")
 
-def download(url : str): #destination : str) -> None:
-    """download and create respective directories"""
-    zip_file = f"{directory}/data.zip"   #f"{destination}.zip"
-    print(f"Downloading from {url}")
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open(zip_file, "wb") as file:
-            file.write(response.content)
-        print(f"Downloaded {url} to {zip_file} successfully")
-        #if not os.path.exists(f"./{destination}"):
-        #    os.makedirs(destination)
-        with zipfile.ZipFile(zip_file, "r") as zip:
-            zip.extractall(f"{directory}")
-        print(f"Extracted file from {zip_file}")
-        os.remove(zip_file)
-        print("Removed zip file")
-    else:
-        print(f"Failed to download {url}")
-
-
-async def init_database() -> None:
+async def init_database_exo(db_name: str, db_user: str, db_passwd: str) -> None:
     """Initialise the data in the database associated to that agency"""
     try:
+        #TODO for exo...
         conn = await asyncpg.connect(
-            database = settings.DB_NAME,
-            user = settings.DB_USERNAME,
-            password = settings.DB_PASSWORD
+            database = db_name,
+            user = db_user,
+            password = db_passwd
         )
         
         await conn.execute("SET client_encoding TO 'UTF8'")
@@ -63,26 +79,26 @@ async def init_database() -> None:
         await conn.execute('DROP INDEX IF EXISTS "StopTimesIndex";')
         await conn.execute('DROP INDEX IF EXISTS "MapIndex";')
 
-        await calendar_table(conn)
-        await calendar_dates_table(conn)
-        await route_table(conn)
-        await forms_table(conn)
-        await shapes_table(conn)
-        await trips_table(conn)
-        await stops_table(conn)
-        await stop_times_table(conn)
-        await stops_info_table(conn)
-        await map_table(conn)
+        await __calendar_table(conn)
+        await __calendar_dates_table(conn)
+        await __route_table(conn)
+        await __forms_table(conn)
+        await __shapes_table(conn)
+        await __trips_table(conn)
+        await __stops_table(conn)
+        await __stop_times_table(conn)
+        await __stops_info_table(conn)
+        await __map_table(conn)
 
         await conn.close()
 
-        answer = input("Do you want to clean up the directory from txt files? (y/n) ")
+        answer = input("Do you want to clean up the __exo_directory from txt files? (y/n) ")
         if answer == "yes" or answer == "y":
             print("Cleaning up")
-            dir_content = os.listdir(directory)
+            dir_content = os.listdir(__exo_directory)
             for content in dir_content:
                 if os.path.isfile(content) and content.endswith(".txt"):
-                    os.remove(f"{directory}/*.txt")
+                    os.remove(f"{__exo_directory}/*.txt")
             print("Cleaned up")
         else:
             print("Not cleaning up")
@@ -92,7 +108,7 @@ async def init_database() -> None:
         sys.exit(1)
 
 
-async def calendar_table(conn: asyncpg.Connection):
+async def __calendar_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "Calendar" (
     	service_id TEXT PRIMARY KEY NOT NULL,
         days VARCHAR(7) NOT NULL,
@@ -103,7 +119,7 @@ async def calendar_table(conn: asyncpg.Connection):
     print("Initialised table Calendar")
 
     print("Inserting in table Calendar and adding data")
-    with open(f"{directory}/calendar.txt", "r", encoding="utf-8") as file:
+    with open(f"{__exo_directory}/calendar.txt", "r", encoding="utf-8") as file:
         file.readline()
         async with conn.transaction():
 
@@ -129,7 +145,7 @@ async def calendar_table(conn: asyncpg.Connection):
                 await conn.execute(sql, tokens[0], days, int(tokens[8]), int(tokens[9]))
     print("Successfully inserted table\n")
 
-async def calendar_dates_table(conn: asyncpg.Connection):
+async def __calendar_dates_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "CalendarDates"(
     	service_id TEXT REFERENCES "Calendar"(service_id) NOT NULL,
         date TEXT NOT NULL,
@@ -140,7 +156,7 @@ async def calendar_dates_table(conn: asyncpg.Connection):
 
     print("Inserting in table CalendarDates")
     #asyncpg expects a binary stream, so explicitely state that the data is in csv format
-    with open(f"{directory}/calendar_dates.txt", "rb") as file:
+    with open(f"{__exo_directory}/calendar_dates.txt", "rb") as file:
         await conn.copy_to_table(
             table_name='CalendarDates',
             source=file,
@@ -151,14 +167,14 @@ async def calendar_dates_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def forms_table(conn: asyncpg.Connection):
+async def __forms_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "Forms"(
     	id SERIAL PRIMARY KEY NOT NULL,
     	shape_id INTEGER UNIQUE NOT NULL
         );""")
     print("Inserting in table Forms")
     records = []
-    with open(f"{directory}/shapes.txt", "r", encoding="utf-8") as file:
+    with open(f"{__exo_directory}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
         
         async with conn.transaction():
@@ -174,7 +190,7 @@ async def forms_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def route_table(conn: asyncpg.Connection):
+async def __route_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "Routes" (
         id SERIAL PRIMARY KEY NOT NULL,
         route_id INTEGER UNIQUE NOT NULL,
@@ -185,7 +201,7 @@ async def route_table(conn: asyncpg.Connection):
     print("Initialised table routes")
 
     print("Inserting in table Route and adding data")
-    with open(f"{directory}/routes.txt", "r", encoding="utf-8") as file:
+    with open(f"{__exo_directory}/routes.txt", "r", encoding="utf-8") as file:
         file.readline()
         records = []
         async with conn.transaction():
@@ -197,7 +213,7 @@ async def route_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def shapes_table(conn: asyncpg.Connection):
+async def __shapes_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "Shapes"(
         id SERIAL PRIMARY KEY,
         shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
@@ -208,7 +224,7 @@ async def shapes_table(conn: asyncpg.Connection):
     print("Initialised table shapes")
 
     print("Inserting in table Shapes")
-    with open(f"{directory}/shapes.txt", "rb") as file:
+    with open(f"{__exo_directory}/shapes.txt", "rb") as file:
         await conn.copy_to_table(
             table_name="Shapes",
             source=file,
@@ -219,7 +235,7 @@ async def shapes_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def stop_times_table(conn: asyncpg.Connection):
+async def __stop_times_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "StopTimes" (
         id SERIAL PRIMARY KEY,
         trip_id INTEGER NOT NULL,
@@ -231,7 +247,7 @@ async def stop_times_table(conn: asyncpg.Connection):
     print("Initialised tmp table StopTimes")
 
     print("Inserting table and adding data")
-    with open(f"{directory}/stop_times.txt", "rb") as file:
+    with open(f"{__exo_directory}/stop_times.txt", "rb") as file:
         await conn.copy_to_table(
             table_name="StopTimes",
             source=file,
@@ -245,7 +261,7 @@ async def stop_times_table(conn: asyncpg.Connection):
     print("Successfully created index for table StopTimes\n")
 
 
-async def stops_table(conn: asyncpg.Connection):
+async def __stops_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TEMP TABLE "TMP_Stops"(
         stop_id TEXT UNIQUE NOT NULL,
         stop_code INTEGER NOT NULL,
@@ -271,7 +287,7 @@ async def stops_table(conn: asyncpg.Connection):
     print("Initialised table stops")
 
     print("Inserting in table Stops")
-    with open(f"{directory}/stops.txt", "rb") as file:
+    with open(f"{__exo_directory}/stops.txt", "rb") as file:
         await conn.copy_to_table(
             table_name='TMP_Stops',
             source=file,
@@ -291,7 +307,7 @@ async def stops_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def trips_table(conn: asyncpg.Connection):
+async def __trips_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TEMP TABLE "TMP_Trips"(
         route_id INTEGER NOT NULL,
         service_id TEXT NOT NULL,
@@ -315,7 +331,7 @@ async def trips_table(conn: asyncpg.Connection):
     );""")
 
     print("Inserting in table Trips and adding data")
-    with open(f"{directory}/trips.txt", "rb") as file:
+    with open(f"{__exo_directory}/trips.txt", "rb") as file:
         await conn.copy_to_table(
             table_name='TMP_Trips',
             source=file,
@@ -334,7 +350,7 @@ async def trips_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def stops_info_table(conn: asyncpg.Connection):
+async def __stops_info_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE IF NOT EXISTS "StopsInfo"(
         id SERIAL PRIMARY KEY,
         stop_name TEXT NOT NULL,
@@ -362,7 +378,7 @@ async def stops_info_table(conn: asyncpg.Connection):
     await conn.execute('CREATE INDEX "StopsInfoIndex" ON "StopsInfo"(route_id,stop_name);')
 
 
-async def map_table(conn: asyncpg.Connection):
+async def __map_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "Map" (
         id SERIAL PRIMARY KEY,
         trip_id INTEGER NOT NULL,
@@ -390,21 +406,3 @@ async def map_table(conn: asyncpg.Connection):
 )
     print("Successfully created index for table Map\n")
 
-
-def main():
-    parser = argparse.ArgumentParser(description="Script to migrate from an sqlite3 database to a postgres database, to better handle concurrency tasks")
-
-    parser.add_argument("--stm", "-s", action="store_true", help="Download stm data")
-    parser.add_argument("--exo", "-e", action="store_true", help="Download exo data")
-    parser.add_argument("--no-download", "-n", action="store_true", help="Do not download the required files")
-
-    args = parser.parse_args()
-
-    if not args.no_download:
-        download("https://www.stm.info/sites/default/files/gtfs/gtfs_stm.zip")
-
-    asyncio.run(init_database())
-
-
-if __name__ == "__main__":
-    main()
