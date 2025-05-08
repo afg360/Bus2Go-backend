@@ -27,13 +27,13 @@ def main():
         if not args.no_download:
             asyncio.run(migration.download_stm())
 
-        asyncio.run(migration.init_database_stm(settings.DB_NAME, settings.DB_USERNAME, settings.DB_PASSWORD))
+        asyncio.run(migration.init_database_stm(settings.DB_1_NAME, settings.DB_USERNAME, settings.DB_PASSWORD))
 
     elif args.exo:
         if not args.no_download:
             asyncio.run(migration.download_exo())
 
-        asyncio.run(migration.init_database_exo(settings.DB_NAME, settings.DB_USERNAME, settings.DB_PASSWORD))
+        asyncio.run(migration.init_database_exo(settings.DB_2_NAME, settings.DB_USERNAME, settings.DB_PASSWORD))
 
     else:
         if not args.no_download:
@@ -46,7 +46,7 @@ async def __download_all():
     await asyncio.gather(migration.download_stm(), migration.download_exo())
 
 async def __init_all():
-    await asyncio.gather(migration.init_database_stm(settings.DB_NAME, settings.DB_USERNAME, settings.DB_PASSWORD), migration.init_database_exo(settings.DB_NAME, settings.DB_USERNAME, settings.DB_PASSWORD))
+    await asyncio.gather(migration.init_database_stm(settings.DB_1_NAME, settings.DB_USERNAME, settings.DB_PASSWORD), migration.init_database_exo(settings.DB_2_NAME, settings.DB_USERNAME, settings.DB_PASSWORD))
 
 if __name__ == "__main__":
     main()

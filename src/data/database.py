@@ -53,9 +53,9 @@ class Database():
         if self.__connection_pool is None:
             raise TypeError
 
-        query = """UPDATE Map SET arrival_time = $1 WHERE 
-        trip_id = $2 AND route_id = $3 AND direction_id = $4 
-        AND stop_id = $5;
+        query = """UPDATE Map SET arrival_time = $1 
+        WHERE trip_id = $2 AND route_id = $3 
+        AND direction_id = $4 AND stop_id = $5;
         """
         data = await get_new_realtime_data()
         if data is None:

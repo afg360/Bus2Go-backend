@@ -81,7 +81,7 @@ async def init_database_stm(db_name: str, db_username: str, db_passwd: str) -> N
             print("Not cleaning up")
 
     except asyncpg.PostgresConnectionError:
-        print(f"The username {settings.DB_USERNAME} does not exist. Aborting the script.")
+        print(f"The username {db_username} does not exist. Aborting the script.")
         sys.exit(1)
 
 
@@ -153,7 +153,6 @@ async def __forms_table(conn: asyncpg.Connection):
     records = []
     with open(f"{__stm_directory}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
-        
         async with conn.transaction():
             prev = ""
             for line in file:

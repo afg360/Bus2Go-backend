@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     STM_TOKEN: str
 
     EXO_TOKEN: str
-    DB_NAME: str
+    DB_1_NAME: str
+    DB_2_NAME: str
     DB_USERNAME: str
     DB_PASSWORD: str
     DEBUG_MODE: bool
 
-    
 
     def get_full_version(self) -> str:
         return self.VERSION + self.SUB_VERSION

@@ -21,7 +21,7 @@ async def job():
 @asynccontextmanager
 async def lifespan(app : FastAPI):
     logger.info("Testing start up")
-    await database.init(settings.DB_NAME, settings.DB_USERNAME, settings.DB_PASSWORD)
+    await database.init(settings.DB_1_NAME, settings.DB_USERNAME, settings.DB_PASSWORD)
     scheduler = AsyncIOScheduler()
     scheduler.add_job(job, 'interval', seconds=20)
     scheduler.start()
