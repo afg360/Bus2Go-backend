@@ -17,7 +17,16 @@ async def download_all_database():
 @download_router.get("/stm")
 async def download_stm_database():
     """Download the STM sqlite3 db."""
-    pass
+    response = get_stm_data()
+    if response is None:
+        return HTTPException(status_code = 403)
+
+    else: 
+        return StreamingResponse(
+            content = response["content"],
+            media_type = "application/octet-stream",
+            headers = response["headers"]
+        )
 
 @download_router.get("/exo")
 async def download_exo_database():

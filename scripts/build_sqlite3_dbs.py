@@ -19,6 +19,8 @@ async def execute(is_sample: bool):
         password = settings.DB_PASSWORD
     )
     file_stm = "data/stm_sample_data.db" if is_sample else "data/stm_data.db"
+    if os.path.exists(file_stm):
+        os.remove(file_stm)
     lite_conn = sqlite3.connect(file_stm)
 
     try:
@@ -32,6 +34,8 @@ async def execute(is_sample: bool):
             password = settings.DB_PASSWORD
         )
         file_exo = "data/exo_sample_data.db" if is_sample else "data/exo_data.db"
+        if os.path.exists(file_exo):
+            os.remove(file_exo)
         lite_conn = sqlite3.connect(file_exo)
         await __copy(pg_conn, lite_conn, settings.DB_2_NAME, is_sample, file_exo)
 
@@ -52,10 +56,10 @@ async def execute(is_sample: bool):
 
 async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_name: str, is_sample: bool, file: str):
     cursor = lite_conn.cursor()
-    tables = await pg_conn.fetch("""
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
-            """)
+    tables = await pg_conn.fetch("""SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT LIKE 'Map'
+    ;""")
 
     for table in tables:
         table_name: str = table['table_name']
@@ -163,16 +167,19 @@ async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_
 
             assert(proc2.stdout is not None)
             await proc2.stdout.read()
+            print(f"Data inserted in table {table_name} from database {db_name} succesfully\n")
 
+    lite_conn.commit()
+    print(f"Vaccuming {file} sqlite database")
+    lite_conn.execute("VACUUM;")
     lite_conn.commit()
     print("Operation succeeded")
 
 
 if __name__ == "__main__":
-    print("Building sample database")
     import sys
     if (len(sys.argv) > 1): 
-        print("Real static data")
+        print("Building real static data")
         asyncio.run(execute(False))
     else: 
         print("Sample static data")

@@ -12,14 +12,14 @@ sys.path.append(str(src_path))
 from src import settings
 
 def main():
-    parser = argparse.ArgumentParser(description="Script to migrate from an sqlite3 database to a postgres database, to better handle concurrency tasks")
+    parser = argparse.ArgumentParser(description="Script to initialise a postgres database for Bus2Go-backend. By default, downloads all the required static data from the selected agencies.")
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--stm", "-s", action="store_true", help="Download stm data")
-    group.add_argument("--exo", "-e", action="store_true", help="Download exo data")
-    group.add_argument("--all", "-a", action="store_true", help="Download data from all agencies")
+    group.add_argument("--stm", "-s", action="store_true", help="Initialise the stm database")
+    group.add_argument("--exo", "-e", action="store_true", help="Initialise the exo database")
+    group.add_argument("--all", "-a", action="store_true", help="Initialise databases for all agencies")
 
-    parser.add_argument("--no-download", "-n", action="store_true", help="Do not download the required files")
+    parser.add_argument("--no-download", "-n", action="store_true", help="Do not download the required files (expects required files to already be downloaded)")
 
     args = parser.parse_args()
 

@@ -330,7 +330,7 @@ async def __stops_info_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE IF NOT EXISTS "StopsInfo"(
         id SERIAL PRIMARY KEY,
         stop_name TEXT NOT NULL,
-        route_id INTEGER NOT NULL,
+        route_id INTEGER NOT NULL, --REFERENCES "Routes"(route_id),
         trip_headsign TEXT NOT NULL,
         service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
         arrival_time TEXT NOT NULL,
@@ -346,6 +346,10 @@ async def __stops_info_table(conn: asyncpg.Connection):
         JOIN "Calendar" ON "Calendar".service_id = "Trips".service_id
         JOIN "Stops" ON "StopTimes".stop_id = "Stops".stop_id;
         """)
+
+    async with conn.transaction():
+        await conn.execute('DROP INDEX IF EXISTS "StopTimesIndex";')
+        await conn.execute('DROP TABLE IF EXISTS "StopTimes";')
 
     print("Vacuuming database")
     await conn.execute("VACUUM FULL;")
