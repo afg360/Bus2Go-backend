@@ -194,12 +194,16 @@ def __compress(compressor: zstd.ZstdCompressor, file_name: str):
                     compressor_writer.write(chunk)
     print(f"Compression succesful")
 
+import sys
+def __usage():
+    print("Script that initialises sqlite3 databases by using data stored in the bus2go postgres databases.")
+    print("Usage: build_sqlite3_dbs.py (-f/--full | -s/--sample)")
+    sys.exit(1)
 
 if __name__ == "__main__":
-    import sys
-    if (len(sys.argv) > 1): 
-        print("Building real static data")
+    if (len(sys.argv) != 2): 
+        __usage()
+    if (sys.argv[1] == "-f" or sys.argv[1] == "--full"):
         asyncio.run(execute(False))
-    else: 
-        print("Sample static data")
+    elif (sys.argv[1] == "-s" or sys.argv[1] == "--sample"): 
         asyncio.run(execute(True))

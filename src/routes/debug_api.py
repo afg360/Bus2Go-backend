@@ -14,10 +14,6 @@ if settings.DEBUG_MODE:
     async def debug_status():
         return { "status": "debug mode active" }
     
-    #test with the client to download a few kbs instead of the whole databases
-    @debug_router.get("/sample_data")
-    async def download_all_sample_data():
-        pass
 
     @debug_router.get("/sample_data/stm")
     async def download_stm_sample_data():
@@ -28,7 +24,7 @@ if settings.DEBUG_MODE:
         else: 
             return StreamingResponse(
                 content = response["content"],
-                media_type = "application/octet-stream",
+                media_type = "application/zstd",
                 headers = response["headers"]
             )
 
@@ -42,7 +38,7 @@ if settings.DEBUG_MODE:
         else: 
             return StreamingResponse(
                 content = response["content"],
-                media_type = "application/octet-stream",
+                media_type = "application/zstd",
                 headers = response["headers"]
             )
 

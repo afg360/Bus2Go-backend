@@ -4,8 +4,7 @@ from ..settings import logger
 from ..data import get_file_iterator
 
 def get_stm_sample_data() -> dict[str, Any] | None:
-    """Execute database streaming use case for stm data."""
-    file_name = "stm_sample_data.db"
+    file_name = "stm_sample_data.db.zst"
     return __get_file_iterator(file_name)
 
 def get_stm_data() -> dict[str, Any] | None:
@@ -13,8 +12,7 @@ def get_stm_data() -> dict[str, Any] | None:
     return __get_file_iterator(file_name)
 
 def get_exo_sample_data() -> dict[str, Any] | None:
-    """Execute database streaming use case for exo data."""
-    file_name = "exo_sample_data.db"
+    file_name = "exo_sample_data.db.zst"
     return __get_file_iterator(file_name)
 
 def get_exo_data() -> dict[str, Any] | None:
@@ -24,7 +22,7 @@ def get_exo_data() -> dict[str, Any] | None:
 def __get_file_iterator(file_name: str):
     db_path = f"data/{file_name}"
 
-    logger.info("Downloading sample exo data")
+    logger.info(f"Downloading sample compressed data {file_name}")
 
     file_iterator = get_file_iterator(db_path)
     if file_iterator is None:
