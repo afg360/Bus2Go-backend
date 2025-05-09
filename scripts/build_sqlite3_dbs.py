@@ -3,7 +3,7 @@
 import asyncpg
 import asyncio
 import sqlite3
-import zstandard as zstd
+import gzip
 
 import sys
 import os
@@ -24,11 +24,10 @@ async def execute(is_sample: bool):
     if os.path.exists(file_stm):
         os.remove(file_stm)
     lite_conn = sqlite3.connect(file_stm)
-    compressor = zstd.ZstdCompressor()
 
     try:
         await __copy(pg_conn, lite_conn, settings.DB_1_NAME, is_sample, file_stm)
-        __compress(compressor, file_stm)
+        __compress(file_stm)
         await pg_conn.close()
         lite_conn.close()
 
@@ -42,7 +41,7 @@ async def execute(is_sample: bool):
             os.remove(file_exo)
         lite_conn = sqlite3.connect(file_exo)
         await __copy(pg_conn, lite_conn, settings.DB_2_NAME, is_sample, file_exo)
-        __compress(compressor, file_exo)
+        __compress(file_exo)
 
     except sqlite3.OperationalError: 
         print("Seems like you are missing the data/ directory. You must execute the script at the root level of the project.")
@@ -181,17 +180,16 @@ async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_
     print("Operation succeeded")
 
 
-def __compress(compressor: zstd.ZstdCompressor, file_name: str):
+def __compress(file_name: str):
     print(f"Compressing {file_name}")
     with open(file_name, 'rb') as f_in:
-        with open(f"{file_name}.zst", 'wb') as f_out:
-            with compressor.stream_writer(f_out) as compressor_writer:
-                chunk_size = 1024 * 1024
-                while True:
-                    chunk = f_in.read(chunk_size)
-                    if not chunk:
-                        break
-                    compressor_writer.write(chunk)
+        with gzip.open(f"{file_name}.gz", 'wb') as f_out:
+            chunk_size = 1024 * 1024
+            while True:
+                chunk = f_in.read(chunk_size)
+                if not chunk:
+                    break
+                f_out.write(chunk)
     print(f"Compression succesful")
 
 import sys

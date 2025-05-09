@@ -15,12 +15,12 @@ async def download_stm_database():
     """Download the STM compressed sqlite3 db."""
     response = get_stm_data()
     if response is None:
-        return HTTPException(status_code = 403)
+        return HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
     else: 
         return StreamingResponse(
             content = response["content"],
-            media_type = "application/zstd",
+            media_type = "application/gzip",
             headers = response["headers"]
         )
 
@@ -29,11 +29,11 @@ async def download_exo_database():
     """Download the Exo compressed sqlite3 db (containing data for both buses and trains)."""
     response = get_exo_data()
     if response is None:
-        return HTTPException(status_code = 403)
+        return HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
     else: 
         return StreamingResponse(
             content = response["content"],
-            media_type = "application/zstd",
+            media_type = "application/gzip",
             headers = response["headers"]
         )

@@ -24,6 +24,7 @@ app = FastAPI(title = "Bus2Go-realtime",
               #lifespan = lifespan
               )
 
+#add favicon.ico...
 app.include_router(download_router)
 app.include_router(ws_route)
 app.include_router(util_route)

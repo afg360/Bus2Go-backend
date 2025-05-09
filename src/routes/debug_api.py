@@ -19,7 +19,7 @@ if settings.DEBUG_MODE:
     async def download_stm_sample_data():
         response = get_stm_sample_data()
         if response is None:
-            return HTTPException(status_code = 403)
+            return HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
         else: 
             return StreamingResponse(
@@ -33,7 +33,7 @@ if settings.DEBUG_MODE:
     async def download_exo_sample_data():
         response = get_exo_sample_data()
         if response is None:
-            return HTTPException(status_code = 403)
+            return HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
         else: 
             return StreamingResponse(
