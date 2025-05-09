@@ -14,22 +14,33 @@ sys.path.append(str(src_path))
 
 from src import settings
 
-async def execute(is_sample: bool):
+async def execute(is_sample: bool, overwrite: bool):
     pg_conn: asyncpg.Connection = await asyncpg.connect(
         database = settings.DB_1_NAME, 
         user = settings.DB_USERNAME, 
         password = settings.DB_PASSWORD
     )
     file_stm = "data/stm_sample_data.db" if is_sample else "data/stm_data.db"
-    if os.path.exists(file_stm):
-        os.remove(file_stm)
-    lite_conn = sqlite3.connect(file_stm)
+    lite_conn: sqlite3.Connection | None = None
 
     try:
-        await __copy(pg_conn, lite_conn, settings.DB_1_NAME, is_sample, file_stm)
-        __compress(file_stm)
+        if overwrite:
+            if os.path.exists(file_stm):
+                os.remove(file_stm)
+            lite_conn = sqlite3.connect(file_stm)
+            await __copy(pg_conn, lite_conn, settings.DB_1_NAME, is_sample, file_stm)
+            lite_conn.close()
+            __compress(file_stm)
+        else:
+            if not os.path.exists(file_stm):
+                lite_conn = sqlite3.connect(file_stm)
+                await __copy(pg_conn, lite_conn, settings.DB_1_NAME, is_sample, file_stm)
+                lite_conn.close()
+            else: print(f"Database file {file_stm} already exists.")
+            if not os.path.exists(f"{file_stm}.gz"):
+                __compress(file_stm)
+            else: print(f"Compressed database file {file_stm} already exists.")
         await pg_conn.close()
-        lite_conn.close()
 
         pg_conn = await asyncpg.connect(
             database = settings.DB_2_NAME, 
@@ -37,11 +48,22 @@ async def execute(is_sample: bool):
             password = settings.DB_PASSWORD
         )
         file_exo = "data/exo_sample_data.db" if is_sample else "data/exo_data.db"
-        if os.path.exists(file_exo):
-            os.remove(file_exo)
-        lite_conn = sqlite3.connect(file_exo)
-        await __copy(pg_conn, lite_conn, settings.DB_2_NAME, is_sample, file_exo)
-        __compress(file_exo)
+
+        if overwrite:
+            if os.path.exists(file_exo):
+                os.remove(file_exo)
+            lite_conn = sqlite3.connect(file_exo)
+            await __copy(pg_conn, lite_conn, settings.DB_2_NAME, is_sample, file_exo)
+            __compress(file_exo)
+        else:
+            if not os.path.exists(file_exo):
+                lite_conn = sqlite3.connect(file_exo)
+                await __copy(pg_conn, lite_conn, settings.DB_2_NAME, is_sample, file_exo)
+            else: print(f"Database file {file_exo} already exists.")
+            if not os.path.exists(f"{file_exo}.gz"):
+                __compress(file_exo)
+            else: print(f"Compressed database file {file_exo} already exists.")
+
 
     except sqlite3.OperationalError: 
         print("Seems like you are missing the data/ directory. You must execute the script at the root level of the project.")
@@ -56,7 +78,8 @@ async def execute(is_sample: bool):
     finally:
         if not pg_conn.is_closed():
             await pg_conn.close()
-        lite_conn.close()
+        if lite_conn is not None:
+            lite_conn.close()
 
 async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_name: str, is_sample: bool, file: str):
     cursor = lite_conn.cursor()
@@ -195,13 +218,19 @@ def __compress(file_name: str):
 import sys
 def __usage():
     print("Script that initialises sqlite3 databases by using data stored in the bus2go postgres databases.")
-    print("Usage: build_sqlite3_dbs.py (-f/--full | -s/--sample)")
+    print("Usage: build_sqlite3_dbs.py (-f/--full | -s/--sample) [-o/--overwrite]")
     sys.exit(1)
 
 if __name__ == "__main__":
-    if (len(sys.argv) != 2): 
+    if (len(sys.argv) > 3 or len(sys.argv) < 2): 
         __usage()
+    overwrite = False
+    if (len(sys.argv) == 3):
+        if sys.argv[2] == "-o" or sys.argv[2] == "--overwrite":
+            overwrite = True
+        else: __usage()
+
     if (sys.argv[1] == "-f" or sys.argv[1] == "--full"):
-        asyncio.run(execute(False))
+        asyncio.run(execute(False, overwrite))
     elif (sys.argv[1] == "-s" or sys.argv[1] == "--sample"): 
-        asyncio.run(execute(True))
+        asyncio.run(execute(True, overwrite))
