@@ -9,7 +9,7 @@ def get_stm_sample_data() -> dict[str, Any] | None:
     return __get_file_iterator(file_name)
 
 def get_stm_data() -> dict[str, Any] | None:
-    file_name = "stm_data.db"
+    file_name = "stm_data.db.zst"
     return __get_file_iterator(file_name)
 
 def get_exo_sample_data() -> dict[str, Any] | None:
@@ -18,7 +18,7 @@ def get_exo_sample_data() -> dict[str, Any] | None:
     return __get_file_iterator(file_name)
 
 def get_exo_data() -> dict[str, Any] | None:
-    file_name = "exo_data.db"
+    file_name = "exo_data.db.zst"
     return __get_file_iterator(file_name)
 
 def __get_file_iterator(file_name: str):

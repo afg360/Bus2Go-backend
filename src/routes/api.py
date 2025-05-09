@@ -9,14 +9,10 @@ download_router = routing.APIRouter(
     prefix = "/api/download/" + settings.VERSION
 )
 
-@download_router.get("/")
-async def download_all_database():
-    """Download all the bus2go sqlite3 databases."""
-    pass
 
 @download_router.get("/stm")
 async def download_stm_database():
-    """Download the STM sqlite3 db."""
+    """Download the STM compressed sqlite3 db."""
     response = get_stm_data()
     if response is None:
         return HTTPException(status_code = 403)
@@ -24,13 +20,13 @@ async def download_stm_database():
     else: 
         return StreamingResponse(
             content = response["content"],
-            media_type = "application/octet-stream",
+            media_type = "application/zstd",
             headers = response["headers"]
         )
 
 @download_router.get("/exo")
 async def download_exo_database():
-    """Download the Exo sqlite3 db (containing data for both buses and trains)."""
+    """Download the Exo compressed sqlite3 db (containing data for both buses and trains)."""
     response = get_exo_data()
     if response is None:
         return HTTPException(status_code = 403)
@@ -38,6 +34,6 @@ async def download_exo_database():
     else: 
         return StreamingResponse(
             content = response["content"],
-            media_type = "application/octet-stream",
+            media_type = "application/zstd",
             headers = response["headers"]
         )
