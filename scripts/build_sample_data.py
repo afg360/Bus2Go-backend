@@ -4,6 +4,7 @@ import asyncpg
 import asyncio
 import sqlite3
 import sys
+import os
 from pathlib import Path
 
 src_path = Path(__file__).parents[1]
@@ -11,16 +12,17 @@ sys.path.append(str(src_path))
 
 from src import settings
 
-async def execute():
+async def execute(is_sample: bool):
     pg_conn: asyncpg.Connection = await asyncpg.connect(
         database = settings.DB_1_NAME, 
         user = settings.DB_USERNAME, 
         password = settings.DB_PASSWORD
     )
-    lite_conn = sqlite3.connect("data/stm_sample_data.db")
+    file_stm = "data/stm_sample_data.db" if is_sample else "data/stm_data.db"
+    lite_conn = sqlite3.connect(file_stm)
 
     try:
-        await __copy(pg_conn, lite_conn)
+        await __copy(pg_conn, lite_conn, settings.DB_1_NAME, is_sample, file_stm)
         await pg_conn.close()
         lite_conn.close()
 
@@ -29,8 +31,9 @@ async def execute():
             user = settings.DB_USERNAME, 
             password = settings.DB_PASSWORD
         )
-        lite_conn = sqlite3.connect("data/exo_sample_data.db")
-        await __copy(pg_conn, lite_conn)
+        file_exo = "data/exo_sample_data.db" if is_sample else "data/exo_data.db"
+        lite_conn = sqlite3.connect(file_exo)
+        await __copy(pg_conn, lite_conn, settings.DB_2_NAME, is_sample, file_exo)
 
     except sqlite3.OperationalError: 
         print("Seems like you are missing the data/ directory. You must execute the script at the root level of the project.")
@@ -47,14 +50,15 @@ async def execute():
             await pg_conn.close()
         lite_conn.close()
 
-async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection):
+async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_name: str, is_sample: bool, file: str):
     cursor = lite_conn.cursor()
     tables = await pg_conn.fetch("""
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
             """)
+
     for table in tables:
-        table_name = table['table_name']
+        table_name: str = table['table_name']
         columns = await pg_conn.fetch("""
             SELECT column_name, data_type, is_nullable
             FROM information_schema.columns
@@ -118,25 +122,47 @@ async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection):
         print(f"Create statement: {create_stmt}")
         cursor.execute(create_stmt)
 
-        rows = await pg_conn.fetch(f'SELECT * FROM "{table_name}" LIMIT 70000')
-        if rows is not None:
-            col_names = [col['column_name'] for col in columns]
-            placeholders = ", ".join(["?" for _ in col_names])
-            
-            insert_stmt = f"INSERT INTO {table_name} ({', '.join(col_names)}) VALUES ({placeholders})"
-            
-            for row in rows:
-                # Convert row to list, handling special types
-                values = []
-                for col, val in zip(columns, row):
-                    if val is None:
-                        values.append(None)
-                    elif col['data_type'] == 'boolean':
-                        values.append(1 if val else 0)
-                    else:
-                        values.append(str(val))
+        if is_sample:
+            rows = await pg_conn.fetch(f'SELECT * FROM "{table_name}" LIMIT 70000;' )
+            if rows is not None:
+                col_names = [col['column_name'] for col in columns]
+                placeholders = ", ".join(["?" for _ in col_names])
                 
-                cursor.execute(insert_stmt, values)
+                insert_stmt = f"INSERT INTO {table_name} ({', '.join(col_names)}) VALUES ({placeholders})"
+                
+                for row in rows:
+                    # Convert row to list, handling special types
+                    values = []
+                    for col, val in zip(columns, row):
+                        if val is None:
+                            values.append(None)
+                        elif col['data_type'] == 'boolean':
+                            values.append(1 if val else 0)
+                        else:
+                            values.append(str(val))
+                    
+                    cursor.execute(insert_stmt, values)
+
+        if not is_sample:
+            print(f"Inserting data in table {table_name} from database {db_name}")
+            read, write = os.pipe()
+            proc1 = await asyncio.create_subprocess_exec(
+                "psql",
+                "-c", f"""COPY (SELECT * FROM "{table_name}") TO STDOUT CSV""",
+                "-U", settings.DB_USERNAME,
+                "-d", db_name
+            , stdout=write)
+            os.close(write)
+
+            proc2 = await asyncio.create_subprocess_exec(
+                "sqlite3", file,
+                ".mode csv",
+                f""".import /dev/stdin {table_name}"""
+            , stdin=read, stdout=asyncio.subprocess.PIPE)
+            os.close(read)
+
+            assert(proc2.stdout is not None)
+            await proc2.stdout.read()
 
     lite_conn.commit()
     print("Operation succeeded")
@@ -144,4 +170,10 @@ async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection):
 
 if __name__ == "__main__":
     print("Building sample database")
-    asyncio.run(execute())
+    import sys
+    if (len(sys.argv) > 1): 
+        print("Real static data")
+        asyncio.run(execute(False))
+    else: 
+        print("Sample static data")
+        asyncio.run(execute(True))
