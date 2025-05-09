@@ -1,8 +1,10 @@
 # Bus2Go-backend
 
-> [!WARNING] The application is still under development at the moment.
+> [!WARNING] 
+> The application is still under development at the moment.
 
-> [!WARNING] Although a Dockerfile exists, it hasn't been updated yet. Coming soon.
+> [!WARNING] 
+> Although a Dockerfile exists, it hasn't been updated yet. Coming soon.
 
 This is the backend application for the Bus2Go mobile application, 
 available at [https://github.com/afg360/bus2go](https://github.com/afg360/bus2go).
