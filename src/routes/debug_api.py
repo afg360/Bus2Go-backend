@@ -13,34 +13,39 @@ if settings.DEBUG_MODE:
     @debug_router.get("/status")
     async def debug_status():
         return { "status": "debug mode active" }
-    
 
     @debug_router.get("/sample_data/stm")
     async def download_stm_sample_data():
-        response = get_stm_sample_data()
-        if response is None:
-            return HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
+        try:
+            response = get_stm_sample_data()
+            if response is None:
+                raise HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
-        else: 
-            return StreamingResponse(
-                content = response["content"],
-                media_type = "application/zstd",
-                headers = response["headers"]
-            )
+            else: 
+                return StreamingResponse(
+                    content = response["content"],
+                    media_type = "application/zstd",
+                    headers = response["headers"]
+                )
+        except Exception:
+            raise HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
 
     @debug_router.get("/sample_data/exo")
     async def download_exo_sample_data():
-        response = get_exo_sample_data()
-        if response is None:
-            return HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
+        try:
+            response = get_exo_sample_data()
+            if response is None:
+                raise HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
-        else: 
-            return StreamingResponse(
-                content = response["content"],
-                media_type = "application/zstd",
-                headers = response["headers"]
-            )
+            else: 
+                return StreamingResponse(
+                    content = response["content"],
+                    media_type = "application/zstd",
+                    headers = response["headers"]
+                )
+        except Exception:
+            raise HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
 
 else:
     @debug_router.get("/{path:path}")

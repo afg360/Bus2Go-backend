@@ -14,15 +14,24 @@ class Settings(BaseSettings):
     PORT: int
     SSL_CERT_PATH: str
     SSL_KEY_PATH: str
-    STM_TOKEN: str
 
+    STM_TOKEN: str
     EXO_TOKEN: str
+
     DB_1_NAME: str
     DB_2_NAME: str
+    #Used to determine when the client app should be updated or not before getting the data to avoid schema issues
+    MIN_CLIENT_VERSION_CODE: int
+    MAX_CLIENT_VERSION_CODE: int
+    SQLITE_DB_1_VERSION: int
+    SQLITE_DB_2_VERSION: int
     DB_USERNAME: str
     DB_PASSWORD: str
     DEBUG_MODE: bool
 
+    def get_db_num(self) -> int:
+        """Returns the number of total databases in the project"""
+        return 2
 
     def get_full_version(self) -> str:
         return self.VERSION + self.SUB_VERSION

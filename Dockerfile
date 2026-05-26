@@ -1,15 +1,20 @@
 # syntax=docker/dockerfile:1
 
-# for now it is very large, may need to change
-FROM python:3
+FROM python:3.13-slim
 
 WORKDIR /app
 
-COPY .env main.py database.py gtfs_realtime_pb2.py stm_info.db /app/
+#use this so that the requirements.txt file not be inside the docker container, only present during build time
+RUN --mount=type=bind,source=./requirements.txt,target=/tmp/requirements.txt pip install -r /tmp/requirements.txt
 
-COPY ./misc/requirements.txt /tmp/
-RUN pip install -r /tmp/requirements.txt
+#Setup bus2go databases
+RUN mkdir -p ./data/downloads/{stm,exo}
 
-EXPOSE 8000
+COPY ./src ./src  
+COPY ./scripts ./scripts  
+COPY ./ssl-certs ./ssl-certs  
+COPY ./assets ./assets  
+COPY ./.env ./.env  
+COPY ./entry.py ./entry.py  
 
-CMD ["uvicorn", "main:app", "--port", "8000"]
+ENTRYPOINT ./entry.py

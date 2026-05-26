@@ -1,6 +1,6 @@
 import os
 from typing_extensions import Any
-from ..settings import logger
+from ..settings import logger, settings
 from ..data import get_file_iterator
 
 def get_stm_sample_data() -> dict[str, Any] | None:
@@ -9,9 +9,15 @@ def get_stm_sample_data() -> dict[str, Any] | None:
     return __get_file_iterator(file_name)
 
 def get_stm_data() -> dict[str, Any] | None:
-    file_name = "stm_data.db.gz"
+    file_name = f"stm_data_{settings.SQLITE_DB_1_VERSION}.db.gz"
     logger.info(f"Downloading real compressed data {file_name}")
     return __get_file_iterator(file_name)
+
+def stm_hash_use_case() -> str:
+    file_name = f"data/stm_data_{settings.SQLITE_DB_1_VERSION}.db.gz.txt"
+    logger.info(f"Retrieving STM hash checksum")
+    with open(file_name, "r") as file:
+        return file.read(-1)
 
 def get_exo_sample_data() -> dict[str, Any] | None:
     file_name = "exo_sample_data.db.gz"
@@ -19,7 +25,7 @@ def get_exo_sample_data() -> dict[str, Any] | None:
     return __get_file_iterator(file_name)
 
 def get_exo_data() -> dict[str, Any] | None:
-    file_name = "exo_data.db.gz"
+    file_name = f"exo_data_{settings.SQLITE_DB_2_VERSION}.db.gz"
     logger.info(f"Downloading real compressed data {file_name}")
     return __get_file_iterator(file_name)
 

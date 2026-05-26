@@ -4,8 +4,11 @@ import zipfile
 import os
 import asyncpg
 import sys
+from ._helpers import _config_table
 
-__exo_directory = "data/downloads/exo"
+__downloads_dir = "data/downloads"
+__downloaded_exo_file = f"{__downloads_dir}/exo.zip"
+__extracted_dir = "data/extracted/exo"
 __agencies = [
             "citcrc",   #autos Chambly-Richelieu-Carignan
             "cithsl",   #autos Haut-Saint-Laurent
@@ -28,41 +31,66 @@ async def download_exo():
     jobs = [
         __download(
             "https://exo.quebec/xdata/" + agency + "/google_transit.zip", 
-            f"{__exo_directory}/{agency}"
+            f"{__extracted_dir}/{agency}"
         ) for agency in __agencies
     ]
     await asyncio.gather(*jobs)
     print(f"Downloaded succesfully")
 
-async def __download(url: str, path: str):
-    print(f"{path}/data.zip")
+async def __download(url: str, path: str) -> bool | None:
+    file_path = os.path.join(os.getcwd(), *(path + "/feed_info.txt").split("/"))
+    if not os.path.exists(file_path):
+        return await __download_exo(url, path)
+
+    from datetime import datetime
+    # check today's date and compare with what is written in the feed_info file
+    expiry_date: datetime
+    today = datetime.now()
+    with open(file_path) as file:
+        # could be broken if the feed publisher name also contains ',', but not very likely....
+        metadata = file.readlines()[1].split(",") # the last line of the file contains the actual metadata,
+        # TODO since the field is optinal, may need to use a try catch in case it doesn't exist...'
+        expiry_date_data = metadata[4] # format: YYYYMMDD, DIFFERENT THAN STM'S ONE
+        expiry_date = datetime.strptime(expiry_date_data, "%Y%m%d")
+
+    if today > expiry_date:
+        return await __download_exo(url, path)
+    else:
+        print(f"Database already up to date, no downloading required for {path}")
+        return None
+
+
+async def __download_exo(url: str, path: str) -> bool:
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             if response.status == 200:
                 await asyncio.to_thread(os.makedirs, path, exist_ok=True)
-                zip_file = f"{path}/data.zip"
-                with open(zip_file, "wb") as file:
+                with open(__downloaded_exo_file, "wb") as file:
                     chunk_size = 4092
                     async for chunk in response.content.iter_chunked(chunk_size):
                         file.write(chunk)
-                print(f"Downloaded {url} to {zip_file} successfully")
-                with zipfile.ZipFile(zip_file, "r") as zip:
+                print(f"Downloaded {url} to {__downloaded_exo_file} successfully")
+                with zipfile.ZipFile(__downloaded_exo_file, "r") as zip:
                     zip.extractall(path)
-                print(f"Extracted file from {zip_file}")
-                os.remove(zip_file)
+                print(f"Extracted file")
+                os.remove(__downloaded_exo_file)
                 print("Removed zip file")
+                return True
             else:
                 print(f"Failed to download {url}")
+                return False
 
 
 #TODO delete tmp tables as cleanup mechanism if script fails...?
-async def init_database_exo(db_name: str, db_username: str, db_passwd: str) -> None:
+async def init_database_exo(db_name: str, db_username: str, db_passwd: str, version: int, min_client_req_version: int, max_client_req_version: int) -> None:
     """Initialise the data in the database associated to that agency"""
     try:
+        print("Initialising EXO database")
         async with asyncpg.create_pool(
-            database = db_name,
-            user = db_username,
-            password = db_passwd,
+            dsn=f"postgres://{db_username}:{db_passwd}@database:8080/{db_name}", # using this port because of Docker
+            #database = db_name,
+            #user = db_username,
+            #password = db_passwd,
             min_size = 1,
             max_size = len(__agencies) + 1
         ) as pool:
@@ -81,7 +109,9 @@ async def init_database_exo(db_name: str, db_username: str, db_passwd: str) -> N
                 #await conn.execute('DROP TABLE IF EXISTS "Map" CASCADE;')
                 await conn.execute('DROP INDEX IF EXISTS "StopsInfoIndex";')
                 await conn.execute('DROP INDEX IF EXISTS "StopTimesIndex";')
+                await conn.execute('DROP INDEX IF EXISTS "Config";')
                 #await conn.execute('DROP INDEX IF EXISTS "MapIndex";')
+                await _config_table(conn, version, min_client_req_version, max_client_req_version)
 
             async def __create_tables(agency):
                 async with pool.acquire() as conn:
@@ -99,16 +129,18 @@ async def init_database_exo(db_name: str, db_username: str, db_passwd: str) -> N
                 await __create_tables(agency) 
             #await asyncio.gather(*[__create_tables(agency) for agency in __agencies])
 
-        answer = input("Do you want to clean up the __exo_directory from txt files? (y/n) ")
-        if answer == "yes" or answer == "y":
-            print("Cleaning up")
-            dir_content = os.listdir(__exo_directory)
-            for content in dir_content:
-                if os.path.isfile(content) and content.endswith(".txt"):
-                    os.remove(f"{__exo_directory}/*.txt")
-            print("Cleaned up")
-        else:
-            print("Not cleaning up")
+        #TODO REMOVE COMMENTS WHEN OUTSIDE OF DOCKER
+        #answer = input("Do you want to clean up the __extracted_dir from txt files? (y/n) ")
+        #if answer == "yes" or answer == "y":
+        #    print("Cleaning up")
+        #    dir_content = os.listdir(__extracted_dir)
+        #    for content in dir_content:
+        #        if os.path.isfile(content) and content.endswith(".txt"):
+        #            os.remove(f"{__extracted_dir}/*.txt")
+        #    print("Cleaned up")
+        #else:
+        #    print("Not cleaning up")
+        print("Exo Database initialisation done")
 
     except asyncpg.PostgresConnectionError:
         print(f"The username {db_username} does not exist. Aborting the script.")
@@ -127,7 +159,7 @@ async def __calendar_table(conn: asyncpg.Connection, agency: str):
     print("Initialised table Calendar")
 
     print("Inserting in table Calendar and adding data")
-    with open(f"{__exo_directory}/{agency}/calendar.txt", "r", encoding="utf-8") as file:
+    with open(f"{__extracted_dir}/{agency}/calendar.txt", "r", encoding="utf-8") as file:
         file.readline()
         for line in file:
             tokens = line.replace("\n", "").replace("'", "''").split(",")
@@ -164,7 +196,7 @@ async def __calendar_dates_table(conn: asyncpg.Connection, agency: str):
 
     print("Inserting in table CalendarDates")
     #asyncpg expects a binary stream, so explicitely state that the data is in csv format
-    with open(f"{__exo_directory}/{agency}/calendar_dates.txt", "rb") as file:
+    with open(f"{__extracted_dir}/{agency}/calendar_dates.txt", "rb") as file:
         await conn.copy_to_table(
             table_name='CalendarDates',
             source=file,
@@ -184,7 +216,7 @@ async def __forms_table(conn: asyncpg.Connection, agency: str):
             );""")
     print("Inserting in table Forms")
     records = []
-    with open(f"{__exo_directory}/{agency}/shapes.txt", "r", encoding="utf-8") as file:
+    with open(f"{__extracted_dir}/{agency}/shapes.txt", "r", encoding="utf-8") as file:
         file.readline()
         async with conn.transaction():
             prev = ""
@@ -215,7 +247,7 @@ async def __route_table(conn: asyncpg.Connection, agency: str):
     print("Initialised table routes")
 
     print("Inserting in table Route and adding data")
-    with open(f"{__exo_directory}/{agency}/routes.txt", "r", encoding="utf-8") as file:
+    with open(f"{__extracted_dir}/{agency}/routes.txt", "r", encoding="utf-8") as file:
         file.readline()
         records = []
         async with conn.transaction():
@@ -246,7 +278,7 @@ async def __shapes_table(conn: asyncpg.Connection, agency: str):
     print("Initialised table shapes")
 
     print("Inserting in table Shapes")
-    with open(f"{__exo_directory}/{agency}/shapes.txt", "rb") as file:
+    with open(f"{__extracted_dir}/{agency}/shapes.txt", "rb") as file:
         async with conn.transaction():
             await conn.copy_to_table(
                 table_name="TMP_Shapes",
@@ -286,7 +318,7 @@ async def __stop_times_table(conn: asyncpg.Connection, agency: str):
     print("Initialised tmp table StopTimes")
 
     print("Inserting table and adding data")
-    with open(f"{__exo_directory}/{agency}/stop_times.txt", "rb") as file:
+    with open(f"{__extracted_dir}/{agency}/stop_times.txt", "rb") as file:
         async with conn.transaction():
             await conn.copy_to_table(
                 table_name="TMP_StopTimes",
@@ -345,7 +377,7 @@ async def __stops_table(conn: asyncpg.Connection, agency: str):
     print("Initialised table stops")
 
     print("Inserting in table Stops")
-    with open(f"{__exo_directory}/{agency}/stops.txt", "rb") as file:
+    with open(f"{__extracted_dir}/{agency}/stops.txt", "rb") as file:
         async with conn.transaction():
             if agency == "trains":
                 await conn.copy_to_table(
@@ -402,7 +434,7 @@ async def __trips_table(conn: asyncpg.Connection, agency: str):
         );""")
 
     print("Inserting in table Trips and adding data")
-    with open(f"{__exo_directory}/{agency}/trips.txt", "rb") as file:
+    with open(f"{__extracted_dir}/{agency}/trips.txt", "rb") as file:
         async with conn.transaction():
             await conn.copy_to_table(
                 table_name='TMP_Trips',

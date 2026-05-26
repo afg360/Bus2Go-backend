@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.13-slim
+
+WORKDIR /scripts
+
+# For debugging purposes, output print statements without buffering them
+ENV PYTHONUNBUFFERED=1 
+
+RUN --mount=type=bind,source=./requirements.txt,target=/tmp/requirements.txt pip install -r /tmp/requirements.txt
+
+RUN apt update && apt install sqlite3
+
+RUN mkdir -p ./data/downloads && mkdir -p ./data/extracted/{stm,exo} && mkdir -p ./data/sqlite
+
+COPY ./.env .
+COPY ./scripts/init_pg_db.py .
+COPY ./scripts/build_sqlite3_dbs.py .
+COPY ./scripts/bootstrap.py .
+COPY ./scripts/migration/ ./migration
+
+#initialise the dbs everytime we build the image by executing python scripts
+ENTRYPOINT ./bootstrap.py
