@@ -120,7 +120,6 @@ async def __generate_dbs(is_sample: bool, overwrite: bool) -> bool:
         if lite_conn is not None:
             lite_conn.close()
     return is_ok
-
 async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_name: str, is_sample: bool, file: str):
     """
     @param db_name The name of the POSTGRES database
