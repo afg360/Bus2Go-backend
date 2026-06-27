@@ -109,7 +109,7 @@ async def init_database_stm(db_name: str, db_username: str, db_passwd: str, vers
             await __calendar_table(conn)
             await __calendar_dates_table(conn)
             await __route_table(conn)
-            await __forms_table(conn)
+            # await __forms_table(conn)
             await __shapes_table(conn)
             await __trips_table(conn)
 
@@ -210,25 +210,26 @@ async def __calendar_dates_table(conn: asyncpg.Connection):
     print("Successfully inserted table\n")
 
 
-async def __forms_table(conn: asyncpg.Connection):
-    await conn.execute("""CREATE TABLE "Forms"(
-    	id SERIAL PRIMARY KEY NOT NULL,
-    	shape_id INTEGER UNIQUE NOT NULL
-        );""")
-    print("Inserting in table Forms")
-    records = []
-    with open(f"{__extracted_dir}/shapes.txt", "r", encoding="utf-8") as file:
-        file.readline()
-        prev = ""
-        for line in file:
-            tokens = line.split(",")
-            shape_id = tokens[0]
-            if not shape_id == prev:
-                records.append((int(tokens[0]),))
-                prev = shape_id
-        sql = 'INSERT INTO "Forms" (shape_id) VALUES ($1);'
-        await conn.executemany(sql, records)
-    print("Successfully inserted table\n")
+#TODO shape_id is not unique...
+# async def __forms_table(conn: asyncpg.Connection):
+#     await conn.execute("""CREATE TABLE "Forms"(
+#     	id SERIAL PRIMARY KEY NOT NULL,
+#     	shape_id INTEGER UNIQUE NOT NULL
+#         );""")
+#     print("Inserting in table Forms")
+#     records = []
+#     with open(f"{__extracted_dir}/shapes.txt", "r", encoding="utf-8") as file:
+#         file.readline()
+#         prev = ""
+#         for line in file:
+#             tokens = line.split(",")
+#             shape_id = tokens[0]
+#             if not shape_id == prev:
+#                 records.append((int(tokens[0]),))
+#                 prev = shape_id
+#         sql = 'INSERT INTO "Forms" (shape_id) VALUES ($1);'
+#         await conn.executemany(sql, records)
+#     print("Successfully inserted table\n")
 
 
 async def __route_table(conn: asyncpg.Connection):
@@ -256,10 +257,12 @@ async def __route_table(conn: asyncpg.Connection):
 async def __shapes_table(conn: asyncpg.Connection):
     await conn.execute("""CREATE TABLE "Shapes"(
         id SERIAL PRIMARY KEY,
-        shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
-        lat REAL NOT NULL,
-        long REAL NOT NULL,
-        sequence INTEGER NOT NULL
+        shape_id INTEGER NOT NULL,
+        shape_pt_lat REAL NOT NULL,
+        shape_pt_long REAL NOT NULL,
+        shape_pt_sequence INTEGER NOT NULL,
+        route_pattern_id TEXT NOT NULL
+        -- PRIMARY KEY(shape_id, shape_pt_sequence)
     );""")
     print("Initialised table shapes")
 
@@ -269,7 +272,7 @@ async def __shapes_table(conn: asyncpg.Connection):
             table_name="Shapes",
             source=file,
             format="csv",
-            columns=["shape_id", "lat", "long", "sequence"],
+            columns=["shape_id", "shape_pt_lat", "shape_pt_long", "shape_pt_sequence", "route_pattern_id"],
             header=True
         )
     print("Successfully inserted table\n")
@@ -329,7 +332,7 @@ async def __trips_table(conn: asyncpg.Connection):
         service_id TEXT NOT NULL REFERENCES "Calendar"(service_id),
         trip_headsign TEXT NOT NULL,
         direction_id INTEGER NOT NULL,
-        shape_id INTEGER NOT NULL REFERENCES "Forms"(shape_id),
+        shape_id INTEGER NOT NULL, --REFERENCES "Forms"(shape_id),
         wheelchair_accessible INTEGER NOT NULL
     );""")
 
@@ -395,6 +398,7 @@ async def __init_tmp_tables(conn1, conn2, conn3):
         wheelchair_boarding INTEGER NOT NULL
     )
     """)
+    #TODO route_pattern_id should be linkable with other tables
     await conn3.execute("""CREATE UNLOGGED TABLE "TMP_Trips" (
         route_id INTEGER NOT NULL,
         service_id TEXT NOT NULL,
@@ -403,8 +407,7 @@ async def __init_tmp_tables(conn1, conn2, conn3):
         direction_id INTEGER NOT NULL,
         shape_id INTEGER NOT NULL,
         wheelchair_accessible INTEGER NOT NULL,
-        note_fr TEXT,
-        note_en TEXT
+        route_pattern_id TEXT NOT NULL
     );""")
 
     print("Adding data to tmp tables")
@@ -412,7 +415,7 @@ async def __init_tmp_tables(conn1, conn2, conn3):
     await asyncio.gather(
        __import_file(conn1, f"{__extracted_dir}/stop_times.txt", "TMP_StopTimes", ["trip_id", "arrival_time", "departure_time", "stop_id", "stop_seq", "pickup_type"]),
        __import_file(conn2, f"{__extracted_dir}/stops.txt",  "TMP_Stops", ["stop_id", "stop_code", "stop_name", "stop_lat", "stop_lon", "stop_url", "location_type", "parent_station", "wheelchair_boarding"]),
-       __import_file(conn3, f"{__extracted_dir}/trips.txt", "TMP_Trips", ["route_id", "service_id", "trip_id", "trip_headsign", "direction_id", "shape_id", "wheelchair_accessible", "note_fr", "note_en"]),
+       __import_file(conn3, f"{__extracted_dir}/trips.txt", "TMP_Trips", ["route_id", "service_id", "trip_id", "trip_headsign", "direction_id", "shape_id", "wheelchair_accessible", "route_pattern_id"]),
     )
     print("Tmp file adding done")
 

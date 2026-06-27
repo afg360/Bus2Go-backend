@@ -11,6 +11,7 @@ services:
       POSTGRES_PASSWORD: password #FIXME change to a real password
     networks:
       - main
+      # - isolated
     ports:
       - "8080:5432" #default for postgres
     healthcheck:
@@ -21,12 +22,13 @@ services:
           start_period: 60s
 
   setup-db:
+    #TODO remove this pull_policy
+    pull_policy: never
     build:
       context: .
       network: host
       dockerfile: Dockerfile.init
     network_mode: "host"
-    # should add a volume, that could then be used by api service?
     volumes:
       - sqlite-local-data:/scripts/data/sqlite
       - extracted-data:/scripts/data/extracted
@@ -42,13 +44,31 @@ services:
     volumes:
       - sqlite-local-data:/app/data
     networks:
+      # - isolated
       - main
     ports:
       - "8000:80"
       #- "8001:443"
+    profiles: ["api"]
     depends_on:
       database:
         condition: service_healthy
+      setup-db:
+        condition: service_completed_successfully
+
+  #for ci/cd purposes, to verify sync between server and client code
+  dev:
+    build:
+      context: .
+      network: host
+      dockerfile: Dockerfile.dev
+      args:
+        - CLIENT_SCHEMA_FILE_PATH
+    volumes:
+      - sqlite-local-data:/script/data/
+      - ${CLIENT_SCHEMA_FILE_PATH}/3.json:/script/data/file.json:ro
+    profiles: ["dev"]
+    depends_on:
       setup-db:
         condition: service_completed_successfully
 
@@ -58,6 +78,9 @@ volumes:
   sqlite-local-data:
 
 networks:
+  # isolated:
+  #   name: isolated
+  #   internal: true
   main:
     name: main
     driver: bridge

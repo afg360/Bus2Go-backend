@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+
+#TODO use correct script file and
+#TODO change to using python3-slim
+
+FROM alpine:3.24.1
+
+WORKDIR /script
+
+RUN apk update && apk add sqlite jq
+RUN mkdir ./data
+
+# instead of using absolute path of local machine, pass it as an argument during docker build
+# corresponds to the AppDatabase_Impl.java file path
+ARG CLIENT_SCHEMA_FILE_PATH
+ENV CLIENT_SCHEMA_FILE=/script/data/file.json
+
+COPY ./compare_db_schema.sh ./compare_db_schema.sh
+
+ENTRYPOINT ./compare_db_schema.sh
