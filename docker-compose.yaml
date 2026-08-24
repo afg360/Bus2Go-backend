@@ -47,7 +47,7 @@ services:
       # - isolated
       - main
     ports:
-      - "8000:80"
+      - "${PORT}:80"
       #- "8001:443"
     profiles: ["api"]
     depends_on:

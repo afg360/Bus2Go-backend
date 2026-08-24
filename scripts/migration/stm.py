@@ -18,14 +18,20 @@ async def download_stm() -> bool:
     url = "https://www.stm.info/sites/default/files/gtfs/gtfs_stm.zip"
 
     #Before doing anything, check if the data is already up to date or even if it exists
-    file_path = os.path.join(os.getcwd(), "data", "extracted", "stm", "feed_info.txt")
-    if not os.path.exists(file_path):
-        print(f"File {file_path} does not exist. Downloading stm data")
-        return await __download_stm(url)
+    folder_path = os.path.join(os.getcwd(), "data", "extracted", "stm")
+    feed_info_path = os.path.join(folder_path, "feed_info.txt")
+    if not os.path.exists(feed_info_path):
+        print(f"File {feed_info_path} does not exist. Downloading stm data")
+        if not await __download_stm(url):
+            return False
+        print("Sanitising files")
+        for file in os.listdir(folder_path):
+            print("Sanitising file: ", file)
+            await __sanitise_file(os.path.join(folder_path, file))
 
     # check today's date and compare with what is written in the feed_info file
     expiry_date_data: str
-    with open(file_path) as file:
+    with open(feed_info_path) as file:
         # could be broken if the feed publisher name also contains ',', but not very likely....
         metadata = file.readlines()[1].split(",") # the last line of the file contains the actual metadata,
         # TODO since the field is optinal, may need to use a try catch in case it doesn't exist...'
@@ -34,9 +40,28 @@ async def download_stm() -> bool:
         print("Downloaded data up to date, no downloading required")
         return True
     else:
-        print(f"Data out of data since {expiry_date_data}. Downloading from {url}")
-        return await __download_stm(url)
+        print(f"Data out of date since {expiry_date_data}. Downloading from {url}")
+        if not await __download_stm(url):
+            return False
 
+    # sanitise every file by getting rid of empty lines
+    print("Sanitising files")
+    for file in os.listdir(folder_path):
+        print("Sanitising file: ", file)
+        await __sanitise_file(os.path.join(folder_path, file))
+    print("Sanitisation completed")
+
+
+async def __sanitise_file(file_path):
+        proc = await asyncio.subprocess.create_subprocess_exec(
+                "sed", "-i", "/^[[:space:]]*$/d", 
+                file_path,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise Exception(proc.returncode, 'sed', stderr)
 
 async def __download_stm(url: str) -> bool:
     async with aiohttp.ClientSession() as session:
@@ -458,7 +483,7 @@ async def __feed_info(conn: asyncpg.Connection):
         feed_end_date INTEGER NOT NULL,
         feed_version TEXT
     );""")
-    await __import_file(conn, f"{__extracted_dir}/feed_info.txt", "FeedInfo", [ "feed_publisher_name", "feed_publisher_url", "feed_lang", "feed_start_date", "feed_end_date", "feed_version"])
+    await __import_file(conn, f"{__extracted_dir}/feed_info.txt", "FeedInfo", [ "feed_publisher_name", "feed_publisher_url" , "feed_lang", "feed_start_date", "feed_end_date", "feed_version"])
     print("Creating table FeedInfo")
 
 async def __import_file(conn, filepath, table, columns):
