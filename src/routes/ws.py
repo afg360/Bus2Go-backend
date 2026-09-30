@@ -1,14 +1,15 @@
 from fastapi import routing
 from fastapi import WebSocket, WebSocketException, status
 
+from bus2gosettings.settings import logger, settings
+
 from ..models import Response, TransitInfo, TransitTime, Agency
-from ..settings import logger, settings
 from ..data.database import database
 
 #TODO WHEN SENDING DATA VIA WEBSOCKETS, USE SEND_TEXT, NOT FUCKING JSON, EVEN IF SENDING ACTUAL JSON DATA
 
 ws_route = routing.APIRouter(
-    prefix = "/api/realtime/" + settings.VERSION
+    prefix = "/api/realtime/v" + settings.VERSION
 )
 
 #use the query paramaters from a message

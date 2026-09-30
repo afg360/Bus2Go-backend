@@ -13,9 +13,9 @@ services:
       - main
       # - isolated
     ports:
-      - "8080:5432" #default for postgres
+      - "5432:5432" #default for postgres
     healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U docker -d bus2go && pg_isready -U docker -d bus2go_exo"]
+          test: ["CMD-SHELL", "pg_isready -U docker -d stm_server && pg_isready -U docker -d exo_server"]
           interval: 10s
           timeout: 10s
           retries: 5

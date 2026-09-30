@@ -1,15 +1,15 @@
 from fastapi import FastAPI
-import asyncio
-
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import get_swagger_ui_html
+import asyncio
+
+from bus2gosettings.settings import settings
 
 from .routes.api import download_router
 from .routes.ws import ws_route
 from .routes.util import util_route
 from .use_cases.update_real_time_data import lifespan
-from .settings import settings
 
 # add a call where outputs the newer version of the application, perhaps using the github api
 
@@ -46,7 +46,7 @@ app.include_router(ws_route)
 app.include_router(util_route)
 
 
-if settings.DEBUG_MODE:
+if settings.IS_DEBUG:
     from .routes.debug_api import debug_router
     from .routes.debug_ws import debug_ws_route
     app.include_router(debug_router)

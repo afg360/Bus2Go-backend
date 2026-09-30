@@ -1,0 +1,19 @@
+[[agencies]]
+agencyId = "stm"
+name = "stm"
+#TODO change this shit
+server_db_name = "stm_server"
+sqlite_db_name = "stm_data"
+db_version = 5
+api_token = "STM_API_KEY"
+base_api_url = "https://api.stm.info/pub/od/gtfs-rt/ic/v2" 
+
+[[agencies]]
+agencyId = "exo"
+name = "exo"
+#TODO change this shit
+server_db_name = "exo_server"
+sqlite_db_name = "exo_data"
+db_version = 4
+api_token = "EXO_API_KEY"
+base_api_url = ""

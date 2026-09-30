@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-from src.settings import settings
+from bus2gosettings import settings
+
 import uvicorn
 
 if __name__ == "__main__":
-    if settings.DEBUG_MODE:
+    if settings.IS_DEBUG:
         uvicorn.run(
             "src.main:app",
             host=settings.HOST,

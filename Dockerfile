@@ -10,11 +10,14 @@ RUN --mount=type=bind,source=./requirements.txt,target=/tmp/requirements.txt pip
 #Setup bus2go databases
 RUN mkdir -p ./data/downloads/{stm,exo}
 
+COPY ./assets ./assets
+COPY ./ssl-certs ./ssl-certs
+COPY ./entry.py ./entry.py
+COPY ./.env ./.env
+
+#Build the core package at build time
+RUN --mount=type=bind,source=./core,target=/tmp/core,rw pip install --no-cache-dir /tmp/core
+
 COPY ./src ./src  
-COPY ./scripts ./scripts  
-COPY ./ssl-certs ./ssl-certs  
-COPY ./assets ./assets  
-COPY ./.env ./.env  
-COPY ./entry.py ./entry.py  
 
 ENTRYPOINT ./entry.py

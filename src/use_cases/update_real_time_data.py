@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from bus2gosettings.settings import logger, settings
+
 from ..data import database
-from ..settings import logger, settings
 
 
 async def job():

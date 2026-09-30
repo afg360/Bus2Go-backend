@@ -87,7 +87,7 @@ async def init_database_exo(db_name: str, db_username: str, db_passwd: str, vers
     try:
         print("Initialising EXO database")
         async with asyncpg.create_pool(
-            dsn=f"postgres://{db_username}:{db_passwd}@database:8080/{db_name}", # using this port because of Docker
+            dsn=f"postgres://{db_username}:{db_passwd}@database:5432/{db_name}", # using this port because of Docker
             #database = db_name,
             #user = db_username,
             #password = db_passwd,

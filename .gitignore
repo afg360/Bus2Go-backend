@@ -1,8 +1,11 @@
-/venv
+**/venv
+**/dist
+**/build
+**/*egg-info
 **/__pycache__/
 /data/*
 /ssl-certs
-.env
+*.env
 *.proto
 *.log
 *.db

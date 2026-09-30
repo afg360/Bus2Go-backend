@@ -1,10 +1,11 @@
--- Do be used inside the Docker container to initialise the psql database
+-- To be used inside the Docker container to initialise the psql database
+-- TODO Use env variables for username, password, database names, etc.
 
 CREATE USER docker WITH PASSWORD 'password';
-CREATE DATABASE bus2go OWNER docker;
-CREATE DATABASE bus2go_exo OWNER docker;
+CREATE DATABASE stm_server OWNER docker;
+CREATE DATABASE exo_server OWNER docker;
 
-GRANT ALL PRIVILEGES ON DATABASE bus2go TO docker;
-GRANT ALL PRIVILEGES ON DATABASE bus2go_exo TO docker;
+GRANT ALL PRIVILEGES ON DATABASE stm_server TO docker;
+GRANT ALL PRIVILEGES ON DATABASE exo_server TO docker;
 
 GRANT ALL ON SCHEMA public TO docker;

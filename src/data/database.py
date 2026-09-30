@@ -4,11 +4,12 @@ import aiohttp
 import time
 from typing import Self
 
+from bus2gosettings.settings import settings, logger
+
 from . import gtfs_realtime_pb2
 #if settings.DEBUG_MODE:
 import random
 from ..models import Agency, TransitInfo, TransitTime
-from ..settings import settings, logger
 
 
 async def get_new_realtime_data() -> gtfs_realtime_pb2.FeedMessage | None:

@@ -7,27 +7,29 @@ import gzip
 import sys
 import os
 
+from bus2gosettings.agencies import AgencyConfig
+
 from migration import is_expiry_date_up_to_date
 
 
-async def init_sample(overwrite: bool):
-    await __generate_dbs(True, overwrite)
+async def init_sample(agency: AgencyConfig,overwrite: bool):
+    await __generate_dbs(agency, True, overwrite)
 
-async def init_data(overwrite: bool) -> bool:
-    return await __generate_dbs(False, overwrite)
+async def init_data(agency: AgencyConfig, overwrite: bool) -> bool:
+    return await __generate_dbs(agency, False, overwrite)
 
-async def __generate_dbs(is_sample: bool, overwrite: bool) -> bool:
-    pg_conn: asyncpg.Connection = await asyncpg.connect(dsn=f'postgres://{os.environ.get("DB_USERNAME", "")}:{os.environ.get("DB_PASSWORD", "")}@0.0.0.0:8080/{os.environ.get("DB_1_NAME", "")}')
+async def __generate_dbs(agency: AgencyConfig, is_sample: bool, overwrite: bool) -> bool:
+    pg_conn: asyncpg.Connection = await asyncpg.connect(dsn=f'postgres://{os.environ.get("DB_USERNAME", "")}:{os.environ.get("DB_PASSWORD", "")}@0.0.0.0:5432/{agency.server_db_name}')
     lite_conn: sqlite3.Connection | None = None
 
     is_ok = True
-    __file_stm = f"data/sqlite/stm_data.db" if is_sample else f"data/sqlite/stm_data_{os.environ.get("SQLITE_DB_1_VERSION", -1)}.db"
+    __file_stm = f"data/sqlite/{agency.sqlite_db_name}.db" if is_sample else f"data/sqlite/{agency.sqlite_db_name}_{agency.db_version}.db"
     try:
         if overwrite:
             if os.path.exists(__file_stm):
                 os.remove(__file_stm)
             lite_conn = sqlite3.connect(__file_stm)
-            await __copy(pg_conn, lite_conn, os.environ.get("DB_1_NAME", ""), is_sample, __file_stm) 
+            await __copy(pg_conn, lite_conn, agency.server_db_name, is_sample, __file_stm) 
             lite_conn.close() 
             __compress(__file_stm)
             __generate_hash(__file_stm)
@@ -35,7 +37,7 @@ async def __generate_dbs(is_sample: bool, overwrite: bool) -> bool:
             lite_conn = sqlite3.connect(__file_stm)
             # in case we need to redo it from scratch
             if not os.path.exists(__file_stm):
-                await __copy(pg_conn, lite_conn, os.environ.get("DB_1_NAME", ""), is_sample, __file_stm)
+                await __copy(pg_conn, lite_conn, agency.server_db_name, is_sample, __file_stm)
                 if os.path.exists(f"{__file_stm}.gz"):
                     os.remove(f"{__file_stm}.gz")
                     __compress(__file_stm)
@@ -56,7 +58,7 @@ async def __generate_dbs(is_sample: bool, overwrite: bool) -> bool:
                         lite_conn.close()
                         os.remove(__file_stm)
                         lite_conn = sqlite3.connect(__file_stm)
-                        await __copy(pg_conn, lite_conn, os.environ.get("DB_1_NAME", ""), is_sample, __file_stm)
+                        await __copy(pg_conn, lite_conn, agency.sqlite_db_name, is_sample, __file_stm)
                         if os.path.exists(f"{__file_stm}.gz"):
                             os.remove(f"{__file_stm}.gz")
                         __compress(__file_stm)
@@ -64,7 +66,7 @@ async def __generate_dbs(is_sample: bool, overwrite: bool) -> bool:
                 except sqlite3.OperationalError:
                     print("SQLITE FeedInfo doesn't exist, need to init")
                     lite_conn = sqlite3.connect(__file_stm)
-                    await __copy(pg_conn, lite_conn, os.environ.get("DB_1_NAME", ""), is_sample, __file_stm)
+                    await __copy(pg_conn, lite_conn, agency.sqlite_db_name, is_sample, __file_stm)
                     if os.path.exists(f"{__file_stm}.gz"):
                         os.remove(f"{__file_stm}.gz")
                     __compress(__file_stm)
@@ -120,6 +122,7 @@ async def __generate_dbs(is_sample: bool, overwrite: bool) -> bool:
         if lite_conn is not None:
             lite_conn.close()
     return is_ok
+
 async def __copy(pg_conn: asyncpg.Connection, lite_conn: sqlite3.Connection, db_name: str, is_sample: bool, file: str):
     """
     @param db_name The name of the POSTGRES database
@@ -291,6 +294,8 @@ if __name__ == "__main__":
     import dotenv
     dotenv.load_dotenv()
     if (sys.argv[1] == "-f" or sys.argv[1] == "--full"):
-        asyncio.run(init_data(overwrite))
+        pass
+        # asyncio.run(init_data(overwrite))
     elif (sys.argv[1] == "-s" or sys.argv[1] == "--sample"): 
-        asyncio.run(init_sample(overwrite))
+        pass
+        # asyncio.run(init_sample(overwrite))

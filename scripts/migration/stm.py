@@ -28,6 +28,8 @@ async def download_stm() -> bool:
         for file in os.listdir(folder_path):
             print("Sanitising file: ", file)
             await __sanitise_file(os.path.join(folder_path, file))
+        print("Sanitisation completed")
+        return True
 
     # check today's date and compare with what is written in the feed_info file
     expiry_date_data: str
@@ -50,6 +52,7 @@ async def download_stm() -> bool:
         print("Sanitising file: ", file)
         await __sanitise_file(os.path.join(folder_path, file))
     print("Sanitisation completed")
+    return True
 
 
 async def __sanitise_file(file_path):
@@ -83,12 +86,12 @@ async def __download_stm(url: str) -> bool:
                 return False
 
 async def init_database_stm(db_name: str, db_username: str, db_passwd: str, version: int, min_client_req_version: int, max_client_req_version: int) -> bool:
-    """Initialise the data in the database associated to that agency
+    """Initialise the data in the postgres database associated to that agency
     @return True if there was no error, False if there was
     """
     try:
         # TODO change the port to the one bound in Docker since we are using the host network for this script)
-        dsn = f"postgres://{db_username}:{db_passwd}@0.0.0.0:8080/{db_name}"
+        dsn = f"postgres://{db_username}:{db_passwd}@0.0.0.0:5432/{db_name}"
         print("Initialising STM database")
 
         async with asyncpg.create_pool(

@@ -1,6 +1,7 @@
 from typing_extensions import Generator
-from ..settings import logger
 import os
+
+from bus2gosettings.settings import logger
 
 def get_file_iterator(file_path: str) -> Generator[bytes, None, None] | None:
     """Returns an iterator for reading a file in chunks."""

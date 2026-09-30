@@ -8,6 +8,7 @@ FROM alpine:3.24.1
 WORKDIR /script
 
 RUN apk update && apk add sqlite jq
+
 RUN mkdir ./data
 
 # instead of using absolute path of local machine, pass it as an argument during docker build

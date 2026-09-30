@@ -1,6 +1,7 @@
 from enum import Enum
 from pydantic import BaseModel
 
+
 class Agency(str, Enum):
     STM = "STM"
     EXO_BUS = "EXO_BUS"
