@@ -91,7 +91,7 @@ async def init_database_stm(db_name: str, db_username: str, db_passwd: str, vers
     """
     try:
         # TODO change the port to the one bound in Docker since we are using the host network for this script)
-        dsn = f"postgres://{db_username}:{db_passwd}@0.0.0.0:5432/{db_name}"
+        dsn = f"postgres://{db_username}:{db_passwd}@database:5432/{db_name}"
         print("Initialising STM database")
 
         async with asyncpg.create_pool(

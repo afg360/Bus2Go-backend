@@ -5,17 +5,16 @@ services:
 
     volumes:
       - pg-db-data:/var/lib/postgresql/data
-      #instead of copying files from a Dockerfile, do it using volumes
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init.sh:/docker-entrypoint-initdb.d/init.sh
     environment:
-      POSTGRES_PASSWORD: password #FIXME change to a real password
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
     networks:
-      - main
-      # - isolated
+      - isolated
     ports:
       - "5432:5432" #default for postgres
     healthcheck:
-          test: ["CMD-SHELL", "pg_isready -U docker -d stm_server && pg_isready -U docker -d exo_server"]
+          test: ["CMD-SHELL", "pg_isready -U docker -d stm_postgres_database && pg_isready -U docker -d exo_postgres_database"]
           interval: 10s
           timeout: 10s
           retries: 5
@@ -28,7 +27,9 @@ services:
       context: .
       network: host
       dockerfile: Dockerfile.init
-    network_mode: "host"
+    networks:
+      - isolated
+      - main
     volumes:
       - sqlite-local-data:/scripts/data/sqlite
       - extracted-data:/scripts/data/extracted
@@ -44,11 +45,10 @@ services:
     volumes:
       - sqlite-local-data:/app/data
     networks:
-      # - isolated
+      - isolated
       - main
     ports:
       - "${PORT}:80"
-      #- "8001:443"
     profiles: ["api"]
     depends_on:
       database:
@@ -78,9 +78,7 @@ volumes:
   sqlite-local-data:
 
 networks:
-  # isolated:
-  #   name: isolated
-  #   internal: true
+  isolated:
+    internal: true
   main:
     name: main
-    driver: bridge

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bus2gosettings"
-version = "0.1.0-alpha"
+version = "0.1.1-alpha"
 dependencies = [
 	"pydantic>=2.13.5",
 	"pydantic_settings>=2.15.0"

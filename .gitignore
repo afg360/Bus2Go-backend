@@ -11,5 +11,5 @@
 *.db
 *.norg
 *.delete
-*.py
-*.sh
+/*.py
+/*.sh

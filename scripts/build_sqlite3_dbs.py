@@ -19,7 +19,7 @@ async def init_data(agency: AgencyConfig, overwrite: bool) -> bool:
     return await __generate_dbs(agency, False, overwrite)
 
 async def __generate_dbs(agency: AgencyConfig, is_sample: bool, overwrite: bool) -> bool:
-    pg_conn: asyncpg.Connection = await asyncpg.connect(dsn=f'postgres://{os.environ.get("DB_USERNAME", "")}:{os.environ.get("DB_PASSWORD", "")}@0.0.0.0:5432/{agency.server_db_name}')
+    pg_conn: asyncpg.Connection = await asyncpg.connect(dsn=f'postgres://{os.environ.get("DB_USERNAME", "")}:{os.environ.get("DB_PASSWORD", "")}@database:5432/{agency.server_db_name}')
     lite_conn: sqlite3.Connection | None = None
 
     is_ok = True
