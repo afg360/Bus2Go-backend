@@ -22,5 +22,7 @@ COPY ./scripts/init_pg_db.py .
 COPY ./scripts/build_sqlite3_dbs.py .
 COPY ./scripts/migration/ ./migration
 
+RUN chmod +x ./bootstrap.py
+
 #initialise the dbs everytime we build the image by executing python scripts
 ENTRYPOINT ./bootstrap.py

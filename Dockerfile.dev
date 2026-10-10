@@ -18,4 +18,6 @@ ENV CLIENT_SCHEMA_FILE=/script/data/file.json
 
 COPY ./compare_db_schema.sh ./compare_db_schema.sh
 
+RUN chmod +x ./compare_db_schema.sh
+
 ENTRYPOINT ./compare_db_schema.sh

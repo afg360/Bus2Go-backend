@@ -43,11 +43,15 @@ async def download_database(agency_id: str):
         raise HTTPException(status_code = 404, detail="This agency does not exist for the moment")
 
 @download_router.get("/{agency_id}/hash")
-async def get_stm_hash(agency_id: str) -> str:
+async def get_stm_hash(agency_id: str) -> dict[str, str]:
     """Get the SHA256 hash of the compressed sqlite3 db for agency_id used for checking database integrity"""
     if agency_id.lower() in transit_agencies.keys():
         try:
-            return transit_agencies[agency_id.lower()].get_database_hash()
+            agency = transit_agencies[agency_id.lower()]
+            return {
+                    "database": agency.name,
+                    "hash": agency.get_database_hash()
+            }
 
         except Exception:
             raise HTTPException(status_code = 502, detail="File doesn't exist. Forgot to be init")
@@ -56,7 +60,7 @@ async def get_stm_hash(agency_id: str) -> str:
 
 
 @download_router.get("/{agency_id}/version")
-async def get_database_version(agency_id: str):
+async def get_database_version(agency_id: str) -> dict[str, str | int]:
     """Returns the current database version of agency_id"""
     if agency_id.lower() in transit_agencies.keys():
         agency = transit_agencies[agency_id.lower()]

@@ -12,8 +12,10 @@ RUN mkdir -p ./data/downloads/{stm,exo}
 
 COPY ./assets ./assets
 COPY ./ssl-certs ./ssl-certs
-COPY ./entry.py ./entry.py
 COPY ./.env ./.env
+COPY ./entry.py ./entry.py
+
+RUN chmod +x ./entry.py
 
 #Build the core package at build time
 RUN --mount=type=bind,source=./core,target=/tmp/core,rw pip install --no-cache-dir /tmp/core
