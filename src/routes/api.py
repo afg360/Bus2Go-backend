@@ -1,6 +1,8 @@
+from warnings import deprecated
 from fastapi import routing
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi_deprecation import deprecated
 
 from bus2gosettings.settings import settings
 
@@ -10,10 +12,21 @@ download_router = routing.APIRouter(
     prefix = "/api/download/v" + settings.VERSION
 )
 
+@download_router.get("/app-major-version-code-required")
+async def get_app_major_version_code_required():
+    """Get the minimum android app version code needed for the database to work properly"""
+    return {
+        "required_version": settings.REQUIRED_CLIENT_MAJOR_VERSION_CODE
+    }
+
 # {"min": 2, "max": 6}
 @download_router.get("/app-version-code-required")
+@deprecated(
+    detail="Use instead get_app_major_version_code_required"
+)
 async def get_app_version_code_required():
-    """Get the minimum android app version code needed for the database to work properly"""
+    """Deprecated. 
+    Get the minimum android app version code needed for the database to work properly"""
     return {
         "min": settings.MIN_CLIENT_VERSION_CODE,
         "max": settings.MAX_CLIENT_VERSION_CODE

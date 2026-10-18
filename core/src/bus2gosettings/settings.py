@@ -1,3 +1,4 @@
+from warnings import deprecated
 from pydantic_settings import BaseSettings
 import logging
 import sys
@@ -14,9 +15,11 @@ class Settings(BaseSettings):
     SSL_CERT_PATH: str | None
     SSL_KEY_PATH: str | None
 
-    #Used to determine when the client app should be updated or not before getting the data to avoid schema issues
+    # Used to determine when the client app should be updated or not before getting the data to avoid schema issues
+    # @Deprecated("Should use the REQUIRED_CLIENT_MAJOR_VERSION_CODE field instead")
     MIN_CLIENT_VERSION_CODE: int
     MAX_CLIENT_VERSION_CODE: int
+    REQUIRED_CLIENT_MAJOR_VERSION_CODE: int
     DB_USERNAME: str
     DB_PASSWORD: str
     IS_DEBUG: bool
@@ -26,7 +29,7 @@ class Settings(BaseSettings):
         return 2
 
     def get_full_version(self) -> str:
-        return self.VERSION + self.SUB_VERSION
+        return self.VERSION + "." + self.SUB_VERSION
 
     def setup_logging(self) -> logging.Logger:
         """Returns a singleton instance of a logger"""

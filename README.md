@@ -48,4 +48,4 @@ Replace "<my-internal-ip>" with the ip address of the computer from where you wi
 
 Depending on the reverse-proxy you use, some (such as Caddy) automatically handle this, while others (like nginx) will need you to run the command to generate the self-signed certificates yourself.
 
-More information on how to install and configure the server is available at [bus2go.app/guides/server](bus2go.app/guides/server).
+More information on how to install and configure the server is available at [https://bus2go.app/guides/server](https://bus2go.app/guides/server).
